@@ -13,8 +13,5 @@ out/
 
 *.o
 
-Images/*.png
-
-Experiment1/remove-noise
-Experiment2/frequency-filter
-Experiment3/homomorphic
+Part1-Bayes/classify-bayes
+Part2-Euclid/classify-euclid

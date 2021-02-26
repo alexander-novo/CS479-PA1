@@ -9,9 +9,9 @@ DEPFLAGS     = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
 uniq         = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 
 # Source files - add more to auto-compile into .o files
-SOURCES      = Common/image.cpp Common/fft.cpp Common/mask.cpp Part1/main.cpp Part2/main.cpp Part3/main.cpp
+SOURCES      = Common/gauss.cpp Part1-Bayes/main.cpp Part2-Euclid/main.cpp
 # Executable targets - add more to auto-make in default 'all' target
-EXEC         = Part1/remove-noise Part2/frequency-filter Part3/homomorphic
+EXEC         = Part1-Bayes/classify-bayes Part2-Euclid/classify-euclid
 # Targets required for the homework, spearated by part
 REQUIRED_1   = 
 REQUIRED_2   = 
@@ -24,14 +24,14 @@ DEPFILES     = $(SOURCES:%.cpp=$(DEPDIR)/%.d)
 
 .PHONY: all clean report
 
-# By default, make all executable targets and the images required for the homework
+# By default, make all executable targets and the outputs required for the homework
 all: $(EXEC) $(REQUIRED_OUT)
 
 # Executable Targets
-Part1/classify-bayes: $(OBJDIR)/Part1/main.o
+Part1-Bayes/classify-bayes: $(OBJDIR)/Part1-Bayes/main.o $(OBJDIR)/Common/gauss.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-Part2/classify-euclid: $(OBJDIR)/Part2/main.o
+Part2-Euclid/classify-euclid: $(OBJDIR)/Part2-Euclid/main.o $(OBJDIR)/Common/gauss.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 ### Part 1 Outputs ###
@@ -47,7 +47,6 @@ clean:
 	rm -rf $(OBJDIR)
 	rm -f $(EXEC)
 	rm -rf out
-	rm -f Images/*.png
 
 # Generate .png images from .pgm images. Needed for report, since pdfLaTeX doesn't support .pgm images
 %.png: %.pgm
