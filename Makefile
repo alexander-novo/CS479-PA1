@@ -9,7 +9,7 @@ DEPFLAGS     = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
 uniq         = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 
 # Source files - add more to auto-compile into .o files
-SOURCES      = Part1-Bayes/main.cpp Part2-Euclid/main.cpp
+SOURCES      = Common/sample.cpp Part1-Bayes/main.cpp Part2-Euclid/main.cpp
 # Executable targets - add more to auto-make in default 'all' target
 EXEC         = Part1-Bayes/classify-bayes Part2-Euclid/classify-euclid
 # Targets required for the homework, spearated by part
@@ -28,10 +28,10 @@ DEPFILES     = $(SOURCES:%.cpp=$(DEPDIR)/%.d)
 all: $(EXEC) $(REQUIRED_OUT)
 
 # Executable Targets
-Part1-Bayes/classify-bayes: $(OBJDIR)/Part1-Bayes/main.o $(OBJDIR)/Common/gauss.o
+Part1-Bayes/classify-bayes: $(OBJDIR)/Part1-Bayes/main.o $(OBJDIR)/Common/sample.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-Part2-Euclid/classify-euclid: $(OBJDIR)/Part2-Euclid/main.o $(OBJDIR)/Common/gauss.o
+Part2-Euclid/classify-euclid: $(OBJDIR)/Part2-Euclid/main.o $(OBJDIR)/Common/sample.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 ### Part 1 Outputs ###
