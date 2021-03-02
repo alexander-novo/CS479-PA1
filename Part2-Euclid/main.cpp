@@ -7,7 +7,10 @@
 // Struct for inputting arguments from command line
 struct Arguments {
 	DataSet set;
+	unsigned seed = 1;
 };
+
+typedef Vec<DIM> observation;
 
 bool verifyArguments(int argc, char** argv, Arguments& arg, int& err);
 void printHelp();
@@ -18,8 +21,8 @@ int main(int argc, char** argv) {
 
 	if (!verifyArguments(argc, argv, arg, err)) { return err; }
 
-	std::vector<Vec<2>> sample1, sample2;
-	getSample(arg.set, sample1, sample2);
+	std::array<std::vector<observation>, CLASSES> samples;
+	getSamples(arg.set, samples, arg.seed);
 
 	return 0;
 }
@@ -50,14 +53,46 @@ bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
 		return false;
 	}
 
+	// Optional Arguments
+	for (unsigned i = 2; i < argc; i++) {
+		if (!strcmp(argv[i], "-s")) {
+			if (i + 1 >= argc) {
+				std::cout << "Missing seed value\n\n";
+				err = 1;
+				printHelp();
+				return false;
+			}
+
+			char* end;
+			arg.seed = strtol(argv[i + 1], &end, 10);
+			if (end == argv[i + 1]) {
+				std::cout << "\"" << argv[i + 1]
+				          << "\" could not be interpreted as an integer.\n";
+				err = 2;
+				return false;
+			}
+
+			i++;
+		} else {
+			std::cout << "Unrecognised argument \"" << argv[i] << "\".\n";
+			printHelp();
+			err = 1;
+			return false;
+		}
+	}
+
 	return true;
 }
 
 void printHelp() {
+	Arguments arg;
 	std::cout
 	    << "Usage: classify-euclid <data set>                                (1)\n"
 	    << "   or: classify-euclid -h                                        (2)\n\n"
 	    << "(1) Run a Euclidean distance classifier on a specific data set.\n"
 	    << "    Data sets available are 'A' and 'B'.\n"
-	    << "(2) Print this help menu.\n";
+	    << "(2) Print this help menu.\n\n"
+	    << "OPTIONS\n"
+	    << "  -s <seed>    Set the seed used to generate samples.\n"
+	    << "               Defaults to " << arg.seed << ".\n";
 }

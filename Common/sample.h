@@ -1,16 +1,48 @@
+#pragma once
 #include "gauss.h"
+
+#define CLASSES 2
+#define DIM 2
+
+typedef Vec<DIM> observation;
+typedef std::vector<observation> sample;
 
 enum DataSet { A, B };
 
 /**
- * @brief Retreives two samples from distributions as labeled by the assignment.
+ * @brief Retreives samples from distributions as labeled by the assignment.
  *
- * @param set     What distributions to use.
- * @param sample1
- * @param sample2
+ * @param set      What distributions to use.
+ * @param samples
+ * @param seed     Seed the RNG. Keep consistent for the same samples.
  */
-void getSample(DataSet set, std::vector<Vec<2>>& sample1,
-               std::vector<Vec<2>>& sample2);
+void getSamples(DataSet set, std::array<sample, CLASSES>& samples, unsigned seed = 1);
+
+/**
+ * @brief Retrieve the means of a data set.
+ *
+ * @param set                                The data set to get the means of.
+ * @return std::array<observation, CLASSES>  The means.
+ */
+std::array<observation, CLASSES> getMeans(DataSet set);
+
+/**
+ * @brief Retrieve the variances of a data set. The covariance matrix of all samples
+ *        in all data sets are diagonal, so the variances are just the diagonal
+ *        elements.
+ *
+ * @param set                                The data set to get the variances of.
+ * @return std::array<observation, CLASSES>  The variances.
+ */
+std::array<observation, CLASSES> getVars(DataSet set);
+
+/**
+ * @brief Retrieve the number of observations for each sample in a data set.
+ *
+ * @param set                             The data set to get the sizes of.
+ * @return std::array<unsigned, CLASSES>  The sizes.
+ */
+std::array<unsigned, CLASSES> getSizes(DataSet set);
 
 /**
  * @brief Calculate the sample mean from a sample.
@@ -47,7 +79,7 @@ Vec<N> sampleVariance(const std::vector<Vec<N>>& sample, const Vec<N>& sampleMea
 
 #pragma omp parallel for reduction(+ : var)
 	for (unsigned i = 0; i < sample.size(); i++) {
-		double temp = (sample[i] - sampleMean);
+		Vec<N> temp = (sample[i] - sampleMean);
 		var += correction * temp * temp;
 	}
 

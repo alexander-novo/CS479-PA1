@@ -26,6 +26,12 @@ struct Vec {
 
 	T& operator[](unsigned i) { return v[i]; }
 	const T& operator[](unsigned i) const { return v[i]; }
+
+	T dot(const Vec<N, T>& other) const {
+		T re = x * other.x;
+		for (unsigned i = 1; i < N; i++) { re += v[i] * other.v[i]; }
+		return re;
+	}
 };
 
 template <typename T>
@@ -43,6 +49,8 @@ struct Vec<1, T> {
 	}
 	T& operator[](unsigned i) { return v[i]; }
 	const T& operator[](unsigned i) const { return v[i]; }
+
+	T dot(const Vec<1, T>& other) const { return x * other.x; }
 };
 
 template <typename T>
@@ -65,6 +73,8 @@ struct Vec<2, T> {
 	}
 	T& operator[](unsigned i) { return v[i]; }
 	const T& operator[](unsigned i) const { return v[i]; }
+
+	T dot(const Vec<2, T>& other) const { return x * other.x + y * other.y; }
 };
 
 template <unsigned N, typename T>
@@ -133,6 +143,8 @@ void genGaussianSample(Vec<N> mu, Vec<N> sigma, std::vector<Vec<N>>& sample,
                        unsigned seed = 1) {
 #pragma omp parallel
 	{
+		// Seed must be partially based on thread ID, otherwise each thread will gen
+		// same numbers.
 		std::mt19937_64 engine(seed + omp_get_thread_num());
 		std::vector<std::normal_distribution<double>> dists;
 
