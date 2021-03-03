@@ -1,131 +1,18 @@
 #pragma once
 #include <omp.h>
 
+#include <Eigen/Dense>
 #include <iomanip>
 #include <random>
 
-template <unsigned N, typename T = double>
-struct Vec {
-	T v[N];
-	T& x = v[0];
-	T& y = v[1];
-	T& z = v[2];
+using Eigen::Matrix;
+using Eigen::SelfAdjointEigenSolver;
 
-	Vec() {}
-	Vec(const T& value) {
-		for (unsigned i = 0; i < N; i++) v[i] = value;
-	}
-	Vec(const T (&values)[N]) {
-		for (unsigned i = 0; i < N; i++) v[i] = values[i];
-	}
+template <unsigned N>
+using Vec = Matrix<double, N, 1u>;
 
-	Vec<N, T>& operator=(const Vec<N, T>& rhs) {
-		for (unsigned i = 0; i < N; i++) v[i] = rhs[i];
-		return *this;
-	}
-
-	T& operator[](unsigned i) { return v[i]; }
-	const T& operator[](unsigned i) const { return v[i]; }
-
-	T dot(const Vec<N, T>& other) const {
-		T re = x * other.x;
-		for (unsigned i = 1; i < N; i++) { re += v[i] * other.v[i]; }
-		return re;
-	}
-};
-
-template <typename T>
-struct Vec<1, T> {
-	T v[1];
-	T& x = v[0];
-
-	Vec() {}
-	Vec(const T& value) { v[0] = value; }
-	Vec(const T (&values)[1]) { v[0] = values[0]; }
-
-	Vec<1, T>& operator=(const Vec<1, T>& rhs) {
-		v[0] = rhs[0];
-		return *this;
-	}
-	T& operator[](unsigned i) { return v[i]; }
-	const T& operator[](unsigned i) const { return v[i]; }
-
-	T dot(const Vec<1, T>& other) const { return x * other.x; }
-};
-
-template <typename T>
-struct Vec<2, T> {
-	T v[2];
-	T& x = v[0];
-	T& y = v[1];
-
-	Vec() {}
-	Vec(const T& value) {
-		for (unsigned i = 0; i < 2; i++) v[i] = value;
-	}
-	Vec(const T (&values)[2]) {
-		for (unsigned i = 0; i < 2; i++) v[i] = values[i];
-	}
-
-	Vec<2, T>& operator=(const Vec<2, T>& rhs) {
-		for (unsigned i = 0; i < 2; i++) v[i] = rhs[i];
-		return *this;
-	}
-	T& operator[](unsigned i) { return v[i]; }
-	const T& operator[](unsigned i) const { return v[i]; }
-
-	T dot(const Vec<2, T>& other) const { return x * other.x + y * other.y; }
-};
-
-template <unsigned N, typename T>
-Vec<N, T> operator+(const Vec<N, T>& lhs, const Vec<N, T>& rhs) {
-	Vec<N, T> re;
-	for (unsigned i = 0; i < N; i++) { re[i] = lhs[i] + rhs[i]; }
-	return re;
-}
-
-template <unsigned N, typename T>
-Vec<N, T>& operator+=(Vec<N, T>& lhs, const Vec<N, T>& rhs) {
-	for (unsigned i = 0; i < N; i++) { lhs[i] += rhs[i]; }
-	return lhs;
-}
-
-template <unsigned N, typename T>
-Vec<N, T> operator-(const Vec<N, T>& lhs, const Vec<N, T>& rhs) {
-	Vec<N, T> re;
-	for (unsigned i = 0; i < N; i++) { re[i] = lhs[i] - rhs[i]; }
-	return re;
-}
-
-template <unsigned N, typename T>
-Vec<N, T> operator*(const Vec<N, T>& lhs, const Vec<N, T>& rhs) {
-	Vec<N, T> re;
-	for (unsigned i = 0; i < N; i++) { re[i] = lhs[i] * rhs[i]; }
-	return re;
-}
-
-template <unsigned N, typename T>
-Vec<N, T> operator*(const T& lhs, const Vec<N, T>& rhs) {
-	Vec<N, T> re;
-	for (unsigned i = 0; i < N; i++) { re[i] = lhs * rhs[i]; }
-	return re;
-}
-
-template <unsigned N, typename T>
-Vec<N, T> operator*(const Vec<N, T>& lhs, const T& rhs) {
-	Vec<N, T> re;
-	for (unsigned i = 0; i < N; i++) { re[i] = rhs[i] * rhs; }
-	return re;
-}
-
-template <unsigned N, typename T>
-std::ostream& operator<<(std::ostream& lhs, const Vec<N, T>& rhs) {
-	for (unsigned i = 0; i < N - 1; i++) { lhs << rhs[i] << " "; }
-	lhs << rhs[N - 1];
-	return lhs;
-}
-
-#pragma omp declare reduction(+: Vec<2> : omp_out += omp_in) initializer(omp_priv(omp_orig))
+// #pragma omp declare reduction(+: Matrix<double, N, M> : omp_out += omp_in)
+// initializer(omp_priv(omp_orig))
 
 /**
  * @brief Generate a multivariate-normally-distributed random sample with the given
@@ -139,23 +26,28 @@ std::ostream& operator<<(std::ostream& lhs, const Vec<N, T>& rhs) {
  * @param      seed    What to seed the RNG with. Defaults to 1.
  */
 template <unsigned N>
-void genGaussianSample(Vec<N> mu, Vec<N> sigma, std::vector<Vec<N>>& sample,
-                       unsigned seed = 1) {
+void genGaussianSample(const Vec<N>& mu, const Matrix<double, N, N>& Sigma,
+                       std::vector<Vec<N>>& sample, unsigned seed = 1) {
+	SelfAdjointEigenSolver<Matrix<double, N, N>> solver(Sigma);
+
+	Matrix<double, N, N> inverseWhitening =
+	    solver.operatorSqrt() * solver.eigenvectors();
 #pragma omp parallel
 	{
 		// Seed must be partially based on thread ID, otherwise each thread will gen
 		// same numbers.
 		std::mt19937_64 engine(seed + omp_get_thread_num());
-		std::vector<std::normal_distribution<double>> dists;
+		std::normal_distribution<double> dist;
 
 		// Initialise distributions with given information
-		for (unsigned i = 0; i < N; i++) { dists.emplace_back(mu[i], sigma[i]); }
+		// for (unsigned i = 0; i < N; i++) { dists.emplace_back(mu[i], sigma[i]); }
 
 #pragma omp for
 		// Generate random observations. Since the variables are uncorrelated
 		// from a multivariate normal distribution, they are also independent.
 		for (unsigned j = 0; j < sample.size(); j++) {
-			for (unsigned i = 0; i < N; i++) { sample[j][i] = dists[i](engine); }
+			for (unsigned i = 0; i < N; i++) { sample[j][i] = dist(engine); }
+			sample[j] = inverseWhitening * sample[j] + mu;
 		}
 	}
 }

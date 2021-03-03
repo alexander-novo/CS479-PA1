@@ -1,31 +1,35 @@
 #include "sample.h"
 
-void getSamples(DataSet set, std::array<std::vector<Vec<DIM>>, CLASSES>& samples,
+void getSamples(DataSet set, std::array<std::vector<observation>, CLASSES>& samples,
                 unsigned seed) {
-	std::array<unsigned, CLASSES> sizes = getSizes(set);
-	std::array<Vec<DIM>, CLASSES> means = getMeans(set);
-	std::array<Vec<DIM>, CLASSES> vars  = getVars(set);
+	std::array<unsigned, CLASSES> sizes    = getSizes(set);
+	std::array<observation, CLASSES> means = getMeans(set);
+	std::array<CovMatrix, CLASSES> vars    = getVars(set);
 	for (unsigned i = 0; i < CLASSES; i++) {
 		samples[i].resize(sizes[i]);
-		genGaussianSample(means[i], vars[i], samples[i], seed);
+		genGaussianSample<DIM>(means[i], vars[i], samples[i], seed);
 	}
 }
 
-std::array<Vec<DIM>, CLASSES> getMeans(DataSet set) {
+std::array<observation, CLASSES> getMeans(DataSet set) {
 	switch (set) {
 		case DataSet::A:
-			return {{{{1, 1}}, {{4, 4}}}};
+			return {{{1, 1}, {4, 4}}};
 		case DataSet::B:
-			return {{{{1, 1}}, {{4, 4}}}};
+			return {{{1, 1}, {4, 4}}};
+		default:
+			return {{{0, 0}, {0, 0}}};
 	}
 }
 
-std::array<Vec<DIM>, CLASSES> getVars(DataSet set) {
+std::array<CovMatrix, CLASSES> getVars(DataSet set) {
 	switch (set) {
 		case DataSet::A:
-			return {{{{1, 1}}, {{1, 1}}}};
+			return {CovMatrix::Identity(), CovMatrix::Identity()};
 		case DataSet::B:
-			return {{{{1, 1}}, {{2, sqrt(8)}}}};
+			return {CovMatrix::Identity(), Vec<DIM>({2, sqrt(8)}).asDiagonal()};
+		default:
+			return {{{1, 1}, {1, 1}}};
 	}
 }
 
@@ -35,5 +39,7 @@ std::array<unsigned, CLASSES> getSizes(DataSet set) {
 			return {60'000, 140'000};
 		case DataSet::B:
 			return {40'000, 160'000};
+		default:
+			return {100'000, 100'000};
 	}
 }

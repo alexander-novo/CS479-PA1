@@ -1,4 +1,4 @@
-CXXFLAGS     = -std=c++14 -g -fopenmp -Ofast
+CXXFLAGS     = -std=c++14 -g -fopenmp -O3
 OBJDIR       = obj
 DEPDIR       = $(OBJDIR)/.deps
 # Flags which, when added to gcc/g++, will auto-generate dependency files
@@ -10,6 +10,7 @@ uniq         = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),
 
 # Source files - add more to auto-compile into .o files
 SOURCES      = Common/sample.cpp Part1-Bayes/main.cpp Part2-Euclid/main.cpp
+INCLUDES     = -I include/
 # Executable targets - add more to auto-make in default 'all' target
 EXEC         = Part1-Bayes/classify-bayes Part2-Euclid/classify-euclid
 # Targets required for the homework, spearated by part
@@ -35,7 +36,11 @@ Part2-Euclid/classify-euclid: $(OBJDIR)/Part2-Euclid/main.o $(OBJDIR)/Common/sam
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 ### Part 1 Outputs ###
+out/sample1-%.dat out/sample2-%.dat: Part1-Bayes/classify-bayes | out
+	Part1-Bayes/classify-bayes $* -ps1 out/sample1-$*.dat -ps2 out/sample2-$*.dat
 
+out/sample-plot-%.png: out/sample1-%.dat out/sample2-%.dat Part1-Bayes/plot.plt params-test.dat | out
+	gnuplot -e "outfile='$@'" -e "sample1='out/sample1-$*.dat'" -e "sample2='out/sample2-$*.dat'" -e "plotTitle='Sample $*'" -e "paramFile='params-test.dat'" Part1-Bayes/plot.plt
 
 ### Part 2 Outputs ###
 
@@ -55,7 +60,7 @@ clean:
 # Auto-Build .cpp files into .o
 $(OBJDIR)/%.o: %.cpp
 $(OBJDIR)/%.o: %.cpp $(DEPDIR)/%.d | $(DEPDIRS) $(OBJDIRS)
-	$(CXX) $(DEPFLAGS) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(DEPFLAGS) $(INCLUDES) $(CXXFLAGS) -c $< -o $@
 
 # Make generated directories
 $(DEPDIRS) $(OBJDIRS) out: ; @mkdir -p $@

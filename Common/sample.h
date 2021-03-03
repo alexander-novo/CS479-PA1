@@ -1,11 +1,16 @@
 #pragma once
 #include "gauss.h"
 
-#define CLASSES 2
-#define DIM 2
+#define CLASSES 2u
+#define DIM 2u
 
-typedef Vec<DIM> observation;
-typedef std::vector<observation> sample;
+using observation = Vec<DIM>;
+using CovMatrix   = Matrix<double, DIM, DIM>;
+using sample      = std::vector<observation>;
+
+// typedef Vec<DIM> observation;
+// typedef Matrix<double, DIM, DIM> CovMatrix;
+// typedef std::vector<observation> sample;
 
 enum DataSet { A, B };
 
@@ -31,10 +36,10 @@ std::array<observation, CLASSES> getMeans(DataSet set);
  *        in all data sets are diagonal, so the variances are just the diagonal
  *        elements.
  *
- * @param set                                The data set to get the variances of.
- * @return std::array<observation, CLASSES>  The variances.
+ * @param set                              The data set to get the variances of.
+ * @return std::array<CovMatrix, CLASSES>  The variances.
  */
-std::array<observation, CLASSES> getVars(DataSet set);
+std::array<CovMatrix, CLASSES> getVars(DataSet set);
 
 /**
  * @brief Retrieve the number of observations for each sample in a data set.
