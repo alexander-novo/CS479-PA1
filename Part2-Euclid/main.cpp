@@ -21,15 +21,14 @@ int main(int argc, char** argv) {
 
 	if (!verifyArguments(argc, argv, arg, err)) { return err; }
 
-	std::array<std::vector<observation>, CLASSES> samples;
+	std::array<sample, CLASSES> samples;
 	getSamples(arg.set, samples, arg.seed);
 
 	return 0;
 }
 
 bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
-	if (argc < 2 ||
-	    (argc < 2 && strcmp(argv[1], "-h") && strcmp(argv[1], "--help"))) {
+	if (argc < 2 || (argc < 2 && strcmp(argv[1], "-h") && strcmp(argv[1], "--help"))) {
 		std::cout << "Missing operand.\n\n";
 		err = 1;
 		printHelp();
@@ -66,8 +65,7 @@ bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
 			char* end;
 			arg.seed = strtol(argv[i + 1], &end, 10);
 			if (end == argv[i + 1]) {
-				std::cout << "\"" << argv[i + 1]
-				          << "\" could not be interpreted as an integer.\n";
+				std::cout << "\"" << argv[i + 1] << "\" could not be interpreted as an integer.\n";
 				err = 2;
 				return false;
 			}
@@ -86,13 +84,12 @@ bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
 
 void printHelp() {
 	Arguments arg;
-	std::cout
-	    << "Usage: classify-euclid <data set>                                (1)\n"
-	    << "   or: classify-euclid -h                                        (2)\n\n"
-	    << "(1) Run a Euclidean distance classifier on a specific data set.\n"
-	    << "    Data sets available are 'A' and 'B'.\n"
-	    << "(2) Print this help menu.\n\n"
-	    << "OPTIONS\n"
-	    << "  -s <seed>    Set the seed used to generate samples.\n"
-	    << "               Defaults to " << arg.seed << ".\n";
+	std::cout << "Usage: classify-euclid <data set>                                (1)\n"
+	          << "   or: classify-euclid -h                                        (2)\n\n"
+	          << "(1) Run a Euclidean distance classifier on a specific data set.\n"
+	          << "    Data sets available are 'A' and 'B'.\n"
+	          << "(2) Print this help menu.\n\n"
+	          << "OPTIONS\n"
+	          << "  -s <seed>    Set the seed used to generate samples.\n"
+	          << "               Defaults to " << arg.seed << ".\n";
 }

@@ -36,17 +36,34 @@ Part2-Euclid/classify-euclid: $(OBJDIR)/Part2-Euclid/main.o $(OBJDIR)/Common/sam
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 ### Part 1 Outputs ###
-out/sample1-%.dat out/sample2-%.dat: Part1-Bayes/classify-bayes | out
-	Part1-Bayes/classify-bayes $* -ps1 out/sample1-$*.dat -ps2 out/sample2-$*.dat
+out/sample1-%.dat out/sample2-%.dat out/sample1-misclass-%.dat out/sample2-misclass-%.dat out/params-%.dat: Part1-Bayes/classify-bayes | out
+	Part1-Bayes/classify-bayes $* -ps1 out/sample1-$*.dat\
+	                              -ps2 out/sample2-$*.dat\
+	                              -pm1 out/sample1-misclass-$*.dat\
+	                              -pm2 out/sample2-misclass-$*.dat\
+	                              -pd  out/params-$*.dat
 
-out/sample-plot-%.png: out/sample1-%.dat out/sample2-%.dat Part1-Bayes/plot.plt params-test.dat | out
-	gnuplot -e "outfile='$@'" -e "sample1='out/sample1-$*.dat'" -e "sample2='out/sample2-$*.dat'" -e "plotTitle='Sample $*'" -e "paramFile='params-test.dat'" Part1-Bayes/plot.plt
+out/sample-plot-%.png: out/sample1-%.dat out/sample2-%.dat out/params-%.dat Part1-Bayes/plot.plt | out
+	@gnuplot -e "outfile='$@'"\
+	         -e "sample1='out/sample1-$*.dat'"\
+	         -e "sample2='out/sample2-$*.dat'"\
+	         -e "plotTitle='Sample $*'"\
+	         -e "paramFile='out/params-$*.dat'"\
+	         Part1-Bayes/plot.plt
+
+out/misclass-plot-%.png: out/sample1-misclass-%.dat out/sample2-misclass-%.dat out/params-%.dat Part1-Bayes/plot.plt | out
+	@gnuplot -e "outfile='$@'"\
+	         -e "sample1='out/sample1-misclass-$*.dat'"\
+	         -e "sample2='out/sample2-misclass-$*.dat'"\
+	         -e "plotTitle='Misclassified Observations From Sample $*'"\
+	         -e "paramFile='out/params-$*.dat'"\
+	         Part1-Bayes/plot.plt
 
 ### Part 2 Outputs ###
 
 
 # Figures needed for the report
-report: 
+report: out/sample-plot-A.png out/sample-plot-B.png out/misclass-plot-A.png out/misclass-plot-B.png
 
 clean:
 	rm -rf $(OBJDIR)

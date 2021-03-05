@@ -13,21 +13,20 @@ struct Arguments {
 	DataSet set;
 	unsigned seed             = 1;
 	unsigned discriminantCase = 0;
-	std::ofstream plotFiles[CLASSES], boundaryParamsFile;
+	std::ofstream plotFiles[CLASSES], misclassPlotFiles[CLASSES], boundaryParamsFile;
 };
 
-double discriminateCase1(const observation& obs, const Vec<CLASSES>& mu,
-                         const CovMatrix& varInverse, double logPrior);
-double discriminateCase2(const observation& obs, const Vec<CLASSES>& mu,
-                         const CovMatrix& varInverse, double logPrior);
-double discriminateCase3(const observation& obs, const Vec<CLASSES>& mu,
-                         const CovMatrix& varInverse, double logPrior);
+double discriminateCase1(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
+                         double logPrior);
+double discriminateCase2(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
+                         double logPrior);
+double discriminateCase3(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
+                         double logPrior);
 bool verifyArguments(int argc, char** argv, Arguments& arg, int& err);
 void printHelp();
 
-double (*const discriminantFuncs[])(const observation&, const Vec<CLASSES>&, const CovMatrix&,
-                                    double) = {discriminateCase1, discriminateCase2,
-                                               discriminateCase3};
+double (*const discriminantFuncs[])(const observation&, const Vec<CLASSES>&, const CovMatrix&, double, double) = {
+    discriminateCase1, discriminateCase2, discriminateCase3};
 
 int main(int argc, char** argv) {
 	int err;
@@ -35,13 +34,17 @@ int main(int argc, char** argv) {
 
 	if (!verifyArguments(argc, argv, arg, err)) { return err; }
 
+	sample misclassifications[CLASSES];
 	std::array<sample, CLASSES> samples;
-	std::array<double, CLASSES> logPriors, varDets;
+	std::array<double, CLASSES> logPriors, logVarDets = {};
+	std::array<double, (DIM * (DIM + 1)) / 2 + DIM + 1> boundaryCoeffs;
 	std::array<CovMatrix, CLASSES> varInverses;
 	std::array<observation, CLASSES> means = getMeans(arg.set);
 	std::array<CovMatrix, CLASSES> vars    = getVars(arg.set);
 	std::array<unsigned, CLASSES> sizes    = getSizes(arg.set);
 	getSamples(arg.set, samples, arg.seed);
+
+	observation min = samples[0].front(), max = samples[0].front();
 
 	double totalSize = std::accumulate(sizes.begin(), sizes.end(), 0);
 
@@ -49,9 +52,7 @@ int main(int argc, char** argv) {
 	std::transform(sizes.cbegin(), sizes.cend(), logPriors.begin(),
 	               [totalSize](unsigned size) { return log(size / totalSize); });
 
-	unsigned overallMisclass = 0;
-	double discriminant[CLASSES];
-
+	// Compute which case we're in from the book
 	if (arg.discriminantCase == 0) {
 		// Default case is 3, since it covers all other cases as well
 		arg.discriminantCase = 3;
@@ -79,8 +80,7 @@ int main(int argc, char** argv) {
 			// Same inverse for all classes, and it's a diagonal matrix, so inverse is easy to find.
 			// No need for determinant.
 			CovMatrix inverse = vars[0].diagonal().asDiagonal().inverse();
-			std::for_each(varInverses.begin(), varInverses.end(),
-			              [&inverse](CovMatrix& inv) { inv = inverse; });
+			std::for_each(varInverses.begin(), varInverses.end(), [&inverse](CovMatrix& inv) { inv = inverse; });
 			break;
 		}
 		case 2: {
@@ -88,8 +88,7 @@ int main(int argc, char** argv) {
 			// inverse. Covariance matrices are symmetric positive definite, so we can still find
 			// inverse quickly. No need for determinant.
 			CovMatrix inverse = vars[0].llt().solve(CovMatrix::Identity());
-			std::for_each(varInverses.begin(), varInverses.end(),
-			              [&inverse](CovMatrix& inv) { inv = inverse; });
+			std::for_each(varInverses.begin(), varInverses.end(), [&inverse](CovMatrix& inv) { inv = inverse; });
 			break;
 		}
 		case 3:
@@ -97,72 +96,138 @@ int main(int argc, char** argv) {
 			// we also need determinant and LLT decomposition doesn't give us that. So we use LU
 			// decomposition, which takes longer than LLT but gives us both determinant and
 			// inverse.
-			// std::transform(vars.cbegin(), vars.cend(), varDets.begin(), varInverses, [](const))
+			std::transform(vars.cbegin(), vars.cend(), varInverses.begin(), logVarDets.begin(),
+			               [](const CovMatrix& var, CovMatrix& inverse) {
+				               Eigen::PartialPivLU<CovMatrix> varLU = var.lu();
+
+				               inverse = varLU.inverse();
+
+				               return log(varLU.determinant());
+			               });
 			break;
 	}
 
-	for (unsigned i = 0; i < CLASSES; i++) {
-		unsigned misclass = 0;
+	unsigned overallMisclass = 0;
 
-#pragma omp parallel for reduction(+ : misclass)
+	for (unsigned i = 0; i < CLASSES; i++) {
+		unsigned misclassCount = 0;
+		sample& misclass       = misclassifications[i];
+
+#pragma omp declare reduction(min:observation : omp_out = omp_out.cwiseMin(omp_in)) initializer(omp_priv(omp_orig))
+#pragma omp declare reduction(max:observation : omp_out = omp_out.cwiseMax(omp_in)) initializer(omp_priv(omp_orig))
+#pragma omp declare reduction(append:sample                                                  \
+                              : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end())) \
+    initializer(omp_priv(omp_orig))
+#pragma omp parallel for reduction(+ : misclassCount) reduction(min : min) reduction(max : max) reduction(append : misclass)
 		for (unsigned j = 0; j < samples[i].size(); j++) {
-			double maxDiscriminant = discriminate(samples[i][j], means[0], vars[0], logPriors[0]);
+			double maxDiscriminant = discriminate(samples[i][j], means[0], varInverses[0], logVarDets[0], logPriors[0]);
 			double discriminant;
 
 			for (unsigned k = 1; k < CLASSES; k++) {
-				discriminant = discriminate(samples[i][j], means[k], vars[k], logPriors[k]);
+				discriminant = discriminate(samples[i][j], means[k], varInverses[k], logVarDets[k], logPriors[k]);
 
-				if (k == i && discriminant < maxDiscriminant ||
-				    k > i && discriminant > maxDiscriminant) {
-					misclass++;
+				if (k == i && discriminant < maxDiscriminant || k > i && discriminant > maxDiscriminant) {
+					misclassCount++;
+
+					if (arg.misclassPlotFiles[i]) { misclass.push_back(samples[i][j]); }
+
 					break;
 				}
 
 				maxDiscriminant = std::max(maxDiscriminant, discriminant);
 			}
+
+			min = min.cwiseMin(samples[i][j]);
+			max = max.cwiseMax(samples[i][j]);
 		}
 
 		std::cout << "Misclassification rate for class " << i + 1 << ":\n"
-		          << misclass / (double) sizes[i] << "\n\n";
+		          << misclassCount / (double) sizes[i] << "\n\n";
 
-		overallMisclass += misclass;
+		overallMisclass += misclassCount;
 
 		if (arg.plotFiles[i]) {
 			arg.plotFiles[i] << "#        x           y\n" << std::fixed << std::setprecision(7);
 
 			for (unsigned j = 0; j < samples[i].size(); j++) {
-				for (unsigned k = 0; k < DIM; k++) {
-					arg.plotFiles[i] << std::setw(10) << samples[i][j][k] << "  ";
-				}
+				for (unsigned k = 0; k < DIM; k++) { arg.plotFiles[i] << std::setw(10) << samples[i][j][k] << "  "; }
 				arg.plotFiles[i] << '\n';
+			}
+		}
+
+		if (arg.misclassPlotFiles[i]) {
+			arg.misclassPlotFiles[i] << "#        x           y\n" << std::fixed << std::setprecision(7);
+
+			for (unsigned j = 0; j < misclassifications[i].size(); j++) {
+				for (unsigned k = 0; k < DIM; k++) {
+					arg.misclassPlotFiles[i] << std::setw(10) << misclassifications[i][j][k] << "  ";
+				}
+				arg.misclassPlotFiles[i] << '\n';
 			}
 		}
 	}
 
 	std::cout << "Overall misclassification rate:\n" << overallMisclass / totalSize << '\n';
 
+	if (arg.boundaryParamsFile) {
+		CovMatrix diffW   = -1 / 2.0 * (varInverses[0] - varInverses[1]);
+		observation diffw = varInverses[0] * means[0] - varInverses[1] * means[1];
+
+		// Terms of degree 2 first, in alphabetical order
+		// e.g. x^2 + xy + y^2,
+		// or   x^2 + xy + xz + y^2 + yz + z^2
+		for (unsigned i = 0; i < DIM; i++) {
+			// Diagonals are the coefficients on squared terms
+			boundaryCoeffs[i * DIM] = diffW(i, i);
+			// Off-Diagonals are the coefficients on non-squared terms, and since the matrix is symmetric and xy = yx,
+			// they get doubled.
+			for (unsigned j = 1; j < DIM - i; j++) { boundaryCoeffs[i * DIM + j] = 2 * diffW(i, j + i); }
+		}
+
+		// Then terms of degree 1, once again in alphabetical order
+		for (unsigned i = 0; i < DIM; i++) { boundaryCoeffs[(DIM * (DIM + 1)) / 2 + i] = diffw[i]; }
+
+		// Then finally the constant term
+		boundaryCoeffs.back() =
+		    (-1 / 2.0 * means[0].dot(varInverses[0] * means[0]) - 1 / 2.0 * logVarDets[0] + logPriors[0]) -
+		    (-1 / 2.0 * means[1].dot(varInverses[1] * means[1]) - 1 / 2.0 * logVarDets[1] + logPriors[1]);
+
+		for (unsigned i = 0; i < boundaryCoeffs.size(); i++) {
+			arg.boundaryParamsFile << std::setw(10) << (char) ('a' + i) << "  ";
+		}
+		arg.boundaryParamsFile << std::setw(10) << "xmin"
+		                       << "  " << std::setw(10) << "xmax"
+		                       << "  " << std::setw(10) << "ymin"
+		                       << "  " << std::setw(10) << "ymax\n"
+		                       << std::fixed << std::setprecision(7);
+
+		for (double coeff : boundaryCoeffs) { arg.boundaryParamsFile << std::setw(10) << coeff << "  "; }
+
+		arg.boundaryParamsFile << std::setw(10) << min[0] << "  " << std::setw(10) << max[0] << "  " << std::setw(10)
+		                       << min[1] << "  " << std::setw(10) << max[1];
+	}
+
 	return 0;
 }
 
-double discriminateCase1(const observation& obs, const Vec<CLASSES>& mu,
-                         const CovMatrix& varInverse, double logPrior) {
+double discriminateCase1(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
+                         double logPrior) {
 	// Note that varInverse is what is passed, and the inverse of a diagonal matrix is also a
 	// diagonal matrix with the diagonal elements being the reciprocal of the original elements. So
 	// instead of dividing by sigma^2, we multiply by 1/sigma^2.
 	return (varInverse(0, 0) * mu).dot(obs) - varInverse(0, 0) * mu.dot(mu) / 2.0 + logPrior;
 }
 
-double discriminateCase2(const observation& obs, const Vec<CLASSES>& mu,
-                         const CovMatrix& varInverse, double logPrior) {
-	return (-1 / 2.0) * (obs - mu).transpose() * varInverse * (obs - mu) + logPrior;
+double discriminateCase2(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
+                         double logPrior) {
+	observation inverseMu = varInverse * mu;
+	return inverseMu.dot(obs) - mu.dot(inverseMu) / 2.0 + logPrior;
 }
 
-double discriminateCase3(const observation& obs, const Vec<CLASSES>& mu,
-                         const CovMatrix& varInverse, double logPrior) {
-	// return obs.transpose() * (-1 / 2.0 * varInverse) * obs + (varInverse * mu).transpose() * obs
-	// -
-	//        1 / 2.0 * mu.transpose() * varInverse * mu - 1 / 2.0 * ln()
-	return 0;
+double discriminateCase3(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
+                         double logPrior) {
+	return (obs.dot((-1 / 2.0 * varInverse) * obs) + (varInverse * mu).dot(obs)) - 1 / 2.0 * mu.dot(varInverse * mu) -
+	       logVarDet / 2.0 + logPrior;
 }
 
 bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
@@ -192,6 +257,7 @@ bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
 
 	using namespace std::string_literals;
 	std::regex samplePlotSwitch("-ps([1-"s + std::to_string(CLASSES) + "])"s);
+	std::regex misclassPlotSwitch("-pm([1-"s + std::to_string(CLASSES) + "])"s);
 	std::cmatch match;
 
 	// Optional Arguments
@@ -226,6 +292,25 @@ bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
 
 			arg.plotFiles[classNum].open(argv[i + 1]);
 			if (!arg.plotFiles[classNum]) {
+				std::cout << "Could not open file \"" << argv[i + 1] << "\".\n";
+				err = 2;
+				return false;
+			}
+
+			i++;
+		} else if (std::regex_match(argv[i], match, misclassPlotSwitch)) {
+			char* end;
+			unsigned classNum = strtol(match[1].str().c_str(), &end, 10) - 1;
+
+			if (i + 1 >= argc) {
+				std::cout << "Missing misclassifications of sample " << classNum << " plot file.\n\n";
+				err = 1;
+				printHelp();
+				return false;
+			}
+
+			arg.misclassPlotFiles[classNum].open(argv[i + 1]);
+			if (!arg.misclassPlotFiles[classNum]) {
 				std::cout << "Could not open file \"" << argv[i + 1] << "\".\n";
 				err = 2;
 				return false;
@@ -287,12 +372,14 @@ void printHelp() {
 	          << "    Data sets available are 'A' and 'B'.\n"
 	          << "(2) Print this help menu.\n\n"
 	          << "OPTIONS\n"
-	          << "  -s <seed>    Set the seed used to generate samples.\n"
+	          << "  -s   <seed>  Set the seed used to generate samples.\n"
 	          << "               Defaults to " << arg.seed << ".\n"
 	          << "  -psN <file>  Print all observations from sample N to a file.\n"
 	          << "               N can be 1 to " << CLASSES << ".\n"
+	          << "  -pmN <file>  Print all misclassified observations from sample N to a file.\n"
+	          << "               N can be 1 to " << CLASSES << ".\n"
 	          << "  -pd  <file>  Print the parameters of the decision boundary.\n"
-	          << "  -c  <case>   Override which discriminant case is to be used.\n"
+	          << "  -c   <case>  Override which discriminant case is to be used.\n"
 	          << "               <case> can be 1-3. Higher numbers are more computationally\n"
 	          << "               expensive, but are correct more of the time.\n"
 	          << "               By default, the case will be chosen automatically.\n";

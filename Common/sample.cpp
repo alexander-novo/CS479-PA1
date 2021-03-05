@@ -1,7 +1,6 @@
 #include "sample.h"
 
-void getSamples(DataSet set, std::array<std::vector<observation>, CLASSES>& samples,
-                unsigned seed) {
+void getSamples(DataSet set, std::array<sample, CLASSES>& samples, unsigned seed) {
 	std::array<unsigned, CLASSES> sizes    = getSizes(set);
 	std::array<observation, CLASSES> means = getMeans(set);
 	std::array<CovMatrix, CLASSES> vars    = getVars(set);
@@ -27,7 +26,7 @@ std::array<CovMatrix, CLASSES> getVars(DataSet set) {
 		case DataSet::A:
 			return {CovMatrix::Identity(), CovMatrix::Identity()};
 		case DataSet::B:
-			return {CovMatrix::Identity(), Vec<DIM>({2, sqrt(8)}).asDiagonal()};
+			return {CovMatrix::Identity(), Vec<DIM>({4, 8}).asDiagonal()};
 		default:
 			return {{{1, 1}, {1, 1}}};
 	}

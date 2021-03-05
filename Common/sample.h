@@ -6,7 +6,7 @@
 
 using observation = Vec<DIM>;
 using CovMatrix   = Matrix<double, DIM, DIM>;
-using sample      = std::vector<observation>;
+using sample      = std::vector<observation, aligned_allocator<observation>>;
 
 // typedef Vec<DIM> observation;
 // typedef Matrix<double, DIM, DIM> CovMatrix;
@@ -57,7 +57,7 @@ std::array<unsigned, CLASSES> getSizes(DataSet set);
  * @return Vec<N>  The sample mean.
  */
 template <unsigned N>
-Vec<N> sampleMean(const std::vector<Vec<N>>& sample) {
+Vec<N> sampleMean(const std::vector<Vec<N>, aligned_allocator<Vec<N>>>& sample) {
 	Vec<N> mean       = 0;
 	double correction = 1.0 / sample.size();
 
@@ -78,7 +78,7 @@ Vec<N> sampleMean(const std::vector<Vec<N>>& sample) {
  * @return            The sample variance.
  */
 template <unsigned N>
-Vec<N> sampleVariance(const std::vector<Vec<N>>& sample, const Vec<N>& sampleMean) {
+Vec<N> sampleVariance(const std::vector<Vec<N>, aligned_allocator<Vec<N>>>& sample, const Vec<N>& sampleMean) {
 	Vec<N> var        = 0;
 	double correction = 1.0 / (sample.size() - 1);
 

@@ -2,9 +2,11 @@
 #include <omp.h>
 
 #include <Eigen/Dense>
+#include <Eigen/StdVector>
 #include <iomanip>
 #include <random>
 
+using Eigen::aligned_allocator;
 using Eigen::Matrix;
 using Eigen::SelfAdjointEigenSolver;
 
@@ -27,11 +29,10 @@ using Vec = Matrix<double, N, 1u>;
  */
 template <unsigned N>
 void genGaussianSample(const Vec<N>& mu, const Matrix<double, N, N>& Sigma,
-                       std::vector<Vec<N>>& sample, unsigned seed = 1) {
+                       std::vector<Vec<N>, aligned_allocator<Vec<N>>>& sample, unsigned seed = 1) {
 	SelfAdjointEigenSolver<Matrix<double, N, N>> solver(Sigma);
 
-	Matrix<double, N, N> inverseWhitening =
-	    solver.operatorSqrt() * solver.eigenvectors();
+	Matrix<double, N, N> inverseWhitening = solver.operatorSqrt() * solver.eigenvectors();
 #pragma omp parallel
 	{
 		// Seed must be partially based on thread ID, otherwise each thread will gen

@@ -25,12 +25,10 @@ splot f(x, y)
 
 unset table
 unset contour
-unset xrange
-unset yrange
 
 
 # set terminal pdf enhanced size 8in, 4.8in
-set terminal png enhanced size 8000, 4800 transparent truecolor font "arial,60"
+set terminal png enhanced size 8000, 4800 truecolor font "arial,60"
 set encoding utf8
 set output outfile
 
