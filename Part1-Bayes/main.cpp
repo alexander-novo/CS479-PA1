@@ -8,12 +8,14 @@
 
 #include "../Common/sample.h"
 
+#define PDF_SAMPLES 100
+
 // Struct for inputting arguments from command line
 struct Arguments {
 	DataSet set;
 	unsigned seed             = 1;
 	unsigned discriminantCase = 0;
-	std::ofstream plotFiles[CLASSES], misclassPlotFiles[CLASSES], boundaryParamsFile;
+	std::ofstream plotFiles[CLASSES], misclassPlotFiles[CLASSES], boundaryParamsFile, pdfPlotFile;
 };
 
 double discriminateCase1(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
@@ -36,7 +38,7 @@ int main(int argc, char** argv) {
 
 	sample misclassifications[CLASSES];
 	std::array<sample, CLASSES> samples;
-	std::array<double, CLASSES> logPriors, logVarDets = {};
+	std::array<double, CLASSES> logPriors, varDets = {}, logVarDets = {};
 	std::array<double, (DIM * (DIM + 1)) / 2 + DIM + 1> boundaryCoeffs;
 	std::array<CovMatrix, CLASSES> varInverses;
 	std::array<observation, CLASSES> means = getMeans(arg.set);
@@ -78,17 +80,36 @@ int main(int argc, char** argv) {
 	switch (arg.discriminantCase) {
 		case 1: {
 			// Same inverse for all classes, and it's a diagonal matrix, so inverse is easy to find.
-			// No need for determinant.
-			CovMatrix inverse = vars[0].diagonal().asDiagonal().inverse();
+			// No need for determinant to discriminate, but we need it if we're plotting the pdf.
+			CovMatrix inverse  = vars[0].diagonal().asDiagonal().inverse();
+			double determinant = 1;
+
+			// The determinant of a diagonal matrix is the product of the entries on the main diagonal.
+			// But since this is a scalar matrix, the entries are all the same so it is the power of that scalar.
+			if (arg.pdfPlotFile) { determinant = pow(vars[0](0, 0), DIM); }
+
 			std::for_each(varInverses.begin(), varInverses.end(), [&inverse](CovMatrix& inv) { inv = inverse; });
+			std::for_each(varDets.begin(), varDets.end(), [&determinant](double& det) { det = determinant; });
 			break;
 		}
 		case 2: {
 			// Same inverse for all classes, but this time it's a bit more difficult to find
 			// inverse. Covariance matrices are symmetric positive definite, so we can still find
-			// inverse quickly. No need for determinant.
-			CovMatrix inverse = vars[0].llt().solve(CovMatrix::Identity());
+			// inverse quickly as long as we don't need determinant (which we don't unless we're plotting the pdf).
+			CovMatrix inverse;
+			double determinant;
+			if (!arg.pdfPlotFile) {
+				inverse     = vars[0].llt().solve(CovMatrix::Identity());
+				determinant = 1;
+			} else {
+				// See below why we don't use LLT decomposition in this case
+				Eigen::PartialPivLU<CovMatrix> varLU = vars[0].lu();
+				inverse                              = varLU.inverse();
+				determinant                          = varLU.determinant();
+			}
+
 			std::for_each(varInverses.begin(), varInverses.end(), [&inverse](CovMatrix& inv) { inv = inverse; });
+			std::for_each(varDets.begin(), varDets.end(), [&determinant](double& det) { det = determinant; });
 			break;
 		}
 		case 3:
@@ -96,16 +117,19 @@ int main(int argc, char** argv) {
 			// we also need determinant and LLT decomposition doesn't give us that. So we use LU
 			// decomposition, which takes longer than LLT but gives us both determinant and
 			// inverse.
-			std::transform(vars.cbegin(), vars.cend(), varInverses.begin(), logVarDets.begin(),
+			std::transform(vars.cbegin(), vars.cend(), varInverses.begin(), varDets.begin(),
 			               [](const CovMatrix& var, CovMatrix& inverse) {
 				               Eigen::PartialPivLU<CovMatrix> varLU = var.lu();
 
 				               inverse = varLU.inverse();
 
-				               return log(varLU.determinant());
+				               return varLU.determinant();
 			               });
 			break;
 	}
+
+	// Calculate the logs of the determinants
+	std::transform(varDets.cbegin(), varDets.cend(), logVarDets.begin(), [](const double& det) { return log(det); });
 
 	unsigned overallMisclass = 0;
 
@@ -169,6 +193,42 @@ int main(int argc, char** argv) {
 
 	std::cout << "Overall misclassification rate:\n" << overallMisclass / totalSize << '\n';
 
+	double pdfMax = 0;
+	if (arg.pdfPlotFile) {
+		std::array<double, CLASSES> varDetRoots, priors;
+		std::transform(varDets.cbegin(), varDets.cend(), varDetRoots.begin(), [](double det) { return sqrt(det); });
+		std::transform(logPriors.cbegin(), logPriors.cend(), priors.begin(),
+		               [](double logPrior) { return exp(logPrior); });
+
+		arg.pdfPlotFile << "#        x           y           z       class\n" << std::fixed << std::setprecision(7);
+#pragma omp parallel for ordered collapse(2) reduction(max : pdfMax)
+		for (unsigned x = 0; x < PDF_SAMPLES; x++) {
+			for (unsigned y = 0; y < PDF_SAMPLES; y++) {
+				double xmod = min.x() + x * (max.x() - min.x()) / PDF_SAMPLES;
+				double ymod = min.y() + y * (max.y() - min.y()) / PDF_SAMPLES;
+
+				observation vecX = {xmod, ymod};
+
+				double densities[] = {gaussianDensity<DIM>(vecX, means[0], varInverses[0], varDetRoots[0]) * priors[0],
+				                      gaussianDensity<DIM>(vecX, means[1], varInverses[1], varDetRoots[1]) * priors[1]};
+
+				pdfMax = std::max(pdfMax, densities[0] + densities[1]);
+
+#pragma omp ordered
+				{
+					arg.pdfPlotFile << std::setw(10) << xmod << "  " << std::setw(10) << ymod << "  " << std::setw(10)
+					                << densities[0] + densities[1] << "  " << std::setw(10)
+					                << ((densities[0] > densities[1]) ? 1 : 2);
+
+					if (x != PDF_SAMPLES - 1 || y < PDF_SAMPLES - 1) { arg.pdfPlotFile << '\n'; }
+
+					// gnuplot requires an extra blank line between rows on surface plots
+					if (y == PDF_SAMPLES - 1 && x != PDF_SAMPLES - 1) { arg.pdfPlotFile << '\n'; }
+				}
+			}
+		}
+	}
+
 	if (arg.boundaryParamsFile) {
 		CovMatrix diffW   = -1 / 2.0 * (varInverses[0] - varInverses[1]);
 		observation diffw = varInverses[0] * means[0] - varInverses[1] * means[1];
@@ -198,13 +258,15 @@ int main(int argc, char** argv) {
 		arg.boundaryParamsFile << std::setw(10) << "xmin"
 		                       << "  " << std::setw(10) << "xmax"
 		                       << "  " << std::setw(10) << "ymin"
-		                       << "  " << std::setw(10) << "ymax\n"
+		                       << "  " << std::setw(10) << "ymax"
+		                       << "  " << std::setw(10) << "zmax\n"
 		                       << std::fixed << std::setprecision(7);
 
 		for (double coeff : boundaryCoeffs) { arg.boundaryParamsFile << std::setw(10) << coeff << "  "; }
 
 		arg.boundaryParamsFile << std::setw(10) << min[0] << "  " << std::setw(10) << max[0] << "  " << std::setw(10)
-		                       << min[1] << "  " << std::setw(10) << max[1];
+		                       << min[1] << "  " << std::setw(10) << max[1] << "  " << std::setw(10)
+		                       << round(pdfMax * 100) / 100;
 	}
 
 	return 0;
@@ -317,7 +379,23 @@ bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
 			}
 
 			i++;
-		} else if (!strcmp(argv[i], "-pd")) {
+		} else if (!strcmp(argv[i], "-pdf")) {
+			if (i + 1 >= argc) {
+				std::cout << "Missing probability density function file.\n\n";
+				err = 1;
+				printHelp();
+				return false;
+			}
+
+			arg.pdfPlotFile.open(argv[i + 1]);
+			if (!arg.pdfPlotFile) {
+				std::cout << "Could not open file \"" << argv[i + 1] << "\".\n";
+				err = 2;
+				return false;
+			}
+
+			i++;
+		} else if (!strcmp(argv[i], "-pdb")) {
 			if (i + 1 >= argc) {
 				std::cout << "Missing decision boundary parameter file.\n\n";
 				err = 1;
@@ -378,7 +456,11 @@ void printHelp() {
 	          << "               N can be 1 to " << CLASSES << ".\n"
 	          << "  -pmN <file>  Print all misclassified observations from sample N to a file.\n"
 	          << "               N can be 1 to " << CLASSES << ".\n"
-	          << "  -pd  <file>  Print the parameters of the decision boundary.\n"
+	          << "  -pdf <file>  Print a graph of the probability density function to a file.\n"
+	          << "               There will be an extra column which shows which class is more\n"
+	          << "               likely at that point. Will also allow correct calculation of\n"
+	          << "               zmax in the -pdb file.\n"
+	          << "  -pdb <file>  Print the parameters of the decision boundary.\n"
 	          << "  -c   <case>  Override which discriminant case is to be used.\n"
 	          << "               <case> can be 1-3. Higher numbers are more computationally\n"
 	          << "               expensive, but are correct more of the time.\n"

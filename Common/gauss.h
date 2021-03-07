@@ -52,3 +52,20 @@ void genGaussianSample(const Vec<N>& mu, const Matrix<double, N, N>& Sigma,
 		}
 	}
 }
+
+/**
+ * @brief The probability density function (pdf) for the multivariate gaussian (normal) distribution.
+ *
+ * @tparam N            The dimension of the distribution.
+ * @param x             Where to evaluate the density function at.
+ * @param mu            The mean of the distribution.
+ * @param SigmaInverse  The inverse of the covariance matrix of the distribution.
+ * @param SigmaDetRoot  The square root of the determinant of the distribution.
+ * @return double       The value of the pdf evaluated at x.
+ */
+template <unsigned N>
+double gaussianDensity(const Vec<N>& x, const Vec<N>& mu, const Matrix<double, N, N>& SigmaInverse,
+                       double SigmaDetRoot) {
+	Vec<N> muDiff = x - mu;
+	return 1 / pow(2 * M_PI, N / 2.0) / SigmaDetRoot * exp(-1 / 2.0 * muDiff.dot(SigmaInverse * muDiff));
+}

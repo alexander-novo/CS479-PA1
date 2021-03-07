@@ -1,7 +1,7 @@
 if (!exists("outfile")) outfile='plot.png'
 
 # Read quadratic parameters
-paramNames = system(' head -1 '.paramFile)
+paramNames = system('head -1 '.paramFile)
 paramCount = words(paramNames)
 paramLine = system('head -2 '.paramFile.' | tail -1')
 
@@ -39,6 +39,14 @@ set style fill transparent solid 0.075 noborder
 set style circle radius 0.03
 
 set title plotTitle
+
+if(exists("raw")) {
+	unset border
+	unset xtics
+	unset ytics
+	unset title
+	unset key
+}
 
 plot sample1 u 1:2 w circles notitle,\
      sample2 u 1:2 w circles notitle,\
