@@ -257,6 +257,97 @@ void printPlotFile(std::ofstream& plotFile, const sample& samp) {
 	}
 }
 
+double printPdfPlotFile(std::ofstream& pdfPlotFile, const observation& min, const observation& max,
+                        const array<observation, CLASSES>& means, const array<CovMatrix, CLASSES>& varInverses,
+                        const array<double, CLASSES>& varDets, const array<double, CLASSES>& logPriors) {
+	double pdfMax = 0;
+	array<double, CLASSES> varDetRoots, priors;
+
+	std::transform(varDets.cbegin(), varDets.cend(), varDetRoots.begin(), [](double det) { return sqrt(det); });
+	std::transform(logPriors.cbegin(), logPriors.cend(), priors.begin(), [](double logPrior) { return exp(logPrior); });
+
+	pdfPlotFile << "#        x           y           z       class\n" << std::fixed << std::setprecision(7);
+#pragma omp parallel for ordered collapse(2) reduction(max : pdfMax)
+	for (unsigned x = 0; x < PDF_SAMPLES; x++) {
+		for (unsigned y = 0; y < PDF_SAMPLES; y++) {
+			double xmod = min.x() + x * (max.x() - min.x()) / PDF_SAMPLES;
+			double ymod = min.y() + y * (max.y() - min.y()) / PDF_SAMPLES;
+
+			observation vecX = {xmod, ymod};
+
+			array<double, CLASSES> densities;
+
+			for (unsigned i = 0; i < CLASSES; i++) {
+				densities[i] = gaussianDensity<DIM>(vecX, means[i], varInverses[i], varDetRoots[i]) * priors[i];
+			}
+
+			double jointDensity = std::accumulate(densities.cbegin(), densities.cend(), 0.);
+			unsigned correctClass =
+			    std::distance(densities.cbegin(), std::max_element(densities.cbegin(), densities.cend())) + 1;
+
+			pdfMax = std::max(pdfMax, jointDensity);
+
+#pragma omp ordered
+			{
+				pdfPlotFile << std::setw(10) << xmod << "  " << std::setw(10) << ymod << "  " << std::setw(10)
+				            << jointDensity << "  " << std::setw(10) << correctClass << '\n';
+
+				// gnuplot requires an extra blank line between rows on surface plots
+				if (y == PDF_SAMPLES - 1) { pdfPlotFile << '\n'; }
+			}
+		}
+	}
+
+	return pdfMax;
+}
+
+void printParamsFile(std::ofstream& boundaryParamsFile, const observation& min, const observation& max,
+                     const array<observation, CLASSES>& means, const array<CovMatrix, CLASSES>& varInverses,
+                     const array<double, CLASSES>& logVarDets, const array<double, CLASSES>& logPriors, double pdfMax) {
+	array<double, (DIM * (DIM + 1)) / 2 + DIM + 1> boundaryCoeffs;
+	// Corresponds to the difference in the matrices "W_i" in the book
+	CovMatrix diffW = -1 / 2.0 * (varInverses[0] - varInverses[1]);
+	// Corresponds to the difference in the vectors "w_i" in the book
+	observation diffw = varInverses[0] * means[0] - varInverses[1] * means[1];
+
+	// Terms of degree 2 first, in alphabetical order
+	// e.g. x^2 + xy + y^2,
+	// or   x^2 + xy + xz + y^2 + yz + z^2
+	for (unsigned i = 0; i < DIM; i++) {
+		// Diagonals are the coefficients on squared terms
+		boundaryCoeffs[i * DIM] = diffW(i, i);
+		// Off-Diagonals are the coefficients on non-squared terms, and since the matrix is symmetric and xy = yx,
+		// they get doubled.
+		for (unsigned j = 1; j < DIM - i; j++) { boundaryCoeffs[i * DIM + j] = 2 * diffW(i, j + i); }
+	}
+
+	// Then terms of degree 1, once again in alphabetical order
+	for (unsigned i = 0; i < DIM; i++) { boundaryCoeffs[(DIM * (DIM + 1)) / 2 + i] = diffw[i]; }
+
+	// Then finally the constant term
+	boundaryCoeffs.back() =
+	    (-1 / 2.0 * means[0].dot(varInverses[0] * means[0]) - 1 / 2.0 * logVarDets[0] + logPriors[0]) -
+	    (-1 / 2.0 * means[1].dot(varInverses[1] * means[1]) - 1 / 2.0 * logVarDets[1] + logPriors[1]);
+
+	// Print parameter headers. All coefficients are single letters in alphabetical order, starting with 'a'
+	for (unsigned i = 0; i < boundaryCoeffs.size(); i++) {
+		boundaryParamsFile << std::setw(10) << (char) ('a' + i) << "  ";
+	}
+	// Then misc. parameter headers
+	boundaryParamsFile << std::setw(10) << "xmin"
+	                   << "  " << std::setw(10) << "xmax"
+	                   << "  " << std::setw(10) << "ymin"
+	                   << "  " << std::setw(10) << "ymax"
+	                   << "  " << std::setw(10) << "zmax\n"
+	                   << std::fixed << std::setprecision(7);
+
+	// Print parameters, starting with coefficients calculated above
+	for (double coeff : boundaryCoeffs) { boundaryParamsFile << std::setw(10) << coeff << "  "; }
+	// Then misc. parameters
+	boundaryParamsFile << std::setw(10) << min[0] << "  " << std::setw(10) << max[0] << "  " << std::setw(10) << min[1]
+	                   << "  " << std::setw(10) << max[1] << "  " << std::setw(10) << pdfMax;
+}
+
 bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
 	if (argc < 2 || (argc < 2 && strcmp(argv[1], "-h") && strcmp(argv[1], "--help"))) {
 		std::cout << "Missing operand.\n\n";
@@ -405,97 +496,6 @@ bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
 		}
 	}
 	return true;
-}
-
-double printPdfPlotFile(std::ofstream& pdfPlotFile, const observation& min, const observation& max,
-                        const array<observation, CLASSES>& means, const array<CovMatrix, CLASSES>& varInverses,
-                        const array<double, CLASSES>& varDets, const array<double, CLASSES>& logPriors) {
-	double pdfMax = 0;
-	array<double, CLASSES> varDetRoots, priors;
-
-	std::transform(varDets.cbegin(), varDets.cend(), varDetRoots.begin(), [](double det) { return sqrt(det); });
-	std::transform(logPriors.cbegin(), logPriors.cend(), priors.begin(), [](double logPrior) { return exp(logPrior); });
-
-	pdfPlotFile << "#        x           y           z       class\n" << std::fixed << std::setprecision(7);
-#pragma omp parallel for ordered collapse(2) reduction(max : pdfMax)
-	for (unsigned x = 0; x < PDF_SAMPLES; x++) {
-		for (unsigned y = 0; y < PDF_SAMPLES; y++) {
-			double xmod = min.x() + x * (max.x() - min.x()) / PDF_SAMPLES;
-			double ymod = min.y() + y * (max.y() - min.y()) / PDF_SAMPLES;
-
-			observation vecX = {xmod, ymod};
-
-			array<double, CLASSES> densities;
-
-			for (unsigned i = 0; i < CLASSES; i++) {
-				densities[i] = gaussianDensity<DIM>(vecX, means[i], varInverses[i], varDetRoots[i]) * priors[i];
-			}
-
-			double jointDensity = std::accumulate(densities.cbegin(), densities.cend(), 0.);
-			unsigned correctClass =
-			    std::distance(densities.cbegin(), std::max_element(densities.cbegin(), densities.cend())) + 1;
-
-			pdfMax = std::max(pdfMax, jointDensity);
-
-#pragma omp ordered
-			{
-				pdfPlotFile << std::setw(10) << xmod << "  " << std::setw(10) << ymod << "  " << std::setw(10)
-				            << jointDensity << "  " << std::setw(10) << correctClass << '\n';
-
-				// gnuplot requires an extra blank line between rows on surface plots
-				if (y == PDF_SAMPLES - 1) { pdfPlotFile << '\n'; }
-			}
-		}
-	}
-
-	return pdfMax;
-}
-
-void printParamsFile(std::ofstream& boundaryParamsFile, const observation& min, const observation& max,
-                     const array<observation, CLASSES>& means, const array<CovMatrix, CLASSES>& varInverses,
-                     const array<double, CLASSES>& logVarDets, const array<double, CLASSES>& logPriors, double pdfMax) {
-	array<double, (DIM * (DIM + 1)) / 2 + DIM + 1> boundaryCoeffs;
-	// Corresponds to the difference in the matrices "W_i" in the book
-	CovMatrix diffW = -1 / 2.0 * (varInverses[0] - varInverses[1]);
-	// Corresponds to the difference in the vectors "w_i" in the book
-	observation diffw = varInverses[0] * means[0] - varInverses[1] * means[1];
-
-	// Terms of degree 2 first, in alphabetical order
-	// e.g. x^2 + xy + y^2,
-	// or   x^2 + xy + xz + y^2 + yz + z^2
-	for (unsigned i = 0; i < DIM; i++) {
-		// Diagonals are the coefficients on squared terms
-		boundaryCoeffs[i * DIM] = diffW(i, i);
-		// Off-Diagonals are the coefficients on non-squared terms, and since the matrix is symmetric and xy = yx,
-		// they get doubled.
-		for (unsigned j = 1; j < DIM - i; j++) { boundaryCoeffs[i * DIM + j] = 2 * diffW(i, j + i); }
-	}
-
-	// Then terms of degree 1, once again in alphabetical order
-	for (unsigned i = 0; i < DIM; i++) { boundaryCoeffs[(DIM * (DIM + 1)) / 2 + i] = diffw[i]; }
-
-	// Then finally the constant term
-	boundaryCoeffs.back() =
-	    (-1 / 2.0 * means[0].dot(varInverses[0] * means[0]) - 1 / 2.0 * logVarDets[0] + logPriors[0]) -
-	    (-1 / 2.0 * means[1].dot(varInverses[1] * means[1]) - 1 / 2.0 * logVarDets[1] + logPriors[1]);
-
-	// Print parameter headers. All coefficients are single letters in alphabetical order, starting with 'a'
-	for (unsigned i = 0; i < boundaryCoeffs.size(); i++) {
-		boundaryParamsFile << std::setw(10) << (char) ('a' + i) << "  ";
-	}
-	// Then misc. parameter headers
-	boundaryParamsFile << std::setw(10) << "xmin"
-	                   << "  " << std::setw(10) << "xmax"
-	                   << "  " << std::setw(10) << "ymin"
-	                   << "  " << std::setw(10) << "ymax"
-	                   << "  " << std::setw(10) << "zmax\n"
-	                   << std::fixed << std::setprecision(7);
-
-	// Print parameters, starting with coefficients calculated above
-	for (double coeff : boundaryCoeffs) { boundaryParamsFile << std::setw(10) << coeff << "  "; }
-	// Then misc. parameters
-	boundaryParamsFile << std::setw(10) << min[0] << "  " << std::setw(10) << max[0] << "  " << std::setw(10) << min[1]
-	                   << "  " << std::setw(10) << max[1] << "  " << std::setw(10) << pdfMax;
 }
 
 void printHelp() {
