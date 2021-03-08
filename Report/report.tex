@@ -29,7 +29,7 @@
 
 \title{Programming Assignment 1}
 \subtitle{CS 474\\\url{https://github.com/alexander-novo/CS479-PA1}}
-\author{Nikhil Khedekar\\--\% Work \and Alexander Novotny\\--\% Work}
+\author{Nikhil Khedekar\\--\% Work \and Mehar Mangat\\--\% Work \and Alexander Novotny\\--\% Work}
 \date{Due: March 10, 2021 \\ Submitted: \today}
 
 \begin{document}
@@ -45,6 +45,47 @@
 \label{sec:part-1}
 
 \subsection{Theory}
+
+\subsubsection{Generating arbitrary multivariate Gaussian-distributed random vectors}
+
+While generating random vectors distributed as a standard normal distribution is simple enough (using a Box-Muller transform or the quantile function), we're still left with transforming it to an arbitrary Gaussian distribution. The key to being able to do this is through the Whitening transform, defined as
+\begin{align}
+	A_w^\top &= \qty(\Phi \Lambda^{-1/2})^\top,
+\end{align}
+where $\Sigma = \Phi \Lambda \Phi^{-1}$ is an eigendecomposition ($\Phi$ is an orthonormal matrix of eigenvectors of $\Sigma$ and $\Lambda$ is a diagonal matrix of eigenvalues of $\Sigma$) of the covariance matrix of a multivariate Gaussian distribution. Since $\Sigma$, as a covariance matrix, is a real symmetric matrix, such an eigendecomposition always exists. Applying this whitening transform to $\vec X \sim \mathcal N(\vec 0, \Sigma)$ as
+\begin{equation}
+	\vec Y = A_w^\top \vec X \label{eq:whitening}
+\end{equation}
+yields $Y \sim \mathcal N(\vec 0, A_w^\top \Sigma A_w)$ and
+\begin{align*}
+	A_w^\top \Sigma A_w &= \qty(\Phi \Lambda^{-1/2})^\top \qty(\Phi \Lambda \Phi^{-1}) \qty(\Phi \Lambda^{-1/2})\\
+		&= \qty(\Lambda^{-1/2})^\top \Phi^\top \Phi \Lambda \Lambda^{-1/2}\\
+		&= \Lambda^{-1/2} \Phi^{-1} \Phi \Lambda^{1/2}\\
+		&= \Lambda^0\\
+		&= I,
+\end{align*}
+so $Y \sim \mathcal N(\vec 0, I)$, the standard Gaussian distribution. Then by multiplying both sides of \cref{eq:whitening} by the inverse transformation
+\begin{equation}
+	\begin{aligned}
+		\qty(A_w^\top)^{-1} &= \qty(\qty(\Phi \Lambda^{-1/2})^\top)^{-1}\\
+			&= \qty(\qty(\Phi \Lambda^{-1/2})^{-1})^\top\\
+			&= \qty(\Lambda^{1/2}\Phi^{-1})^\top\\
+			&= \Phi\Lambda^{1/2}\\
+			&= \Phi\Lambda^{1/2}\Phi^{-1}\Phi\\
+			&= \Sigma^{1/2}\Phi,
+	\end{aligned}
+\end{equation}
+we arrive at
+\begin{equation}
+	\vec X = \qty(A_w^\top)^{-1} \vec Y. \label{eq:inverse-whitening}
+\end{equation}
+Then we can simply add $\vec \mu$ to obtain $\vec Z = \vec X + \vec \mu$ where $\vec Z \sim \mathcal N(\vec \mu, \Sigma)$ is our ''goal'' distribution.
+
+\subsubsection{Bayesian classifier for Gaussian-distributed classes}
+
+
+
+\subsubsection{Finding the decision boundary}
 
 \subsection{Implementation}
 

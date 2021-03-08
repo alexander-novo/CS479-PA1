@@ -36,13 +36,13 @@ Part2-Euclid/classify-euclid: $(OBJDIR)/Part2-Euclid/main.o $(OBJDIR)/Common/sam
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 ### Part 1 Outputs ###
-out/sample1-%.dat out/sample2-%.dat out/sample1-misclass-%.dat out/sample2-misclass-%.dat out/params-%.dat out/pdf-%.dat: Part1-Bayes/classify-bayes | out
+out/sample1-%.dat out/sample2-%.dat out/sample1-misclass-%.dat out/sample2-misclass-%.dat out/params-%.dat out/pdf-%.dat out/classification-rate-%.txt: Part1-Bayes/classify-bayes | out
 	Part1-Bayes/classify-bayes $* -ps1 out/sample1-$*.dat\
 	                              -ps2 out/sample2-$*.dat\
 	                              -pm1 out/sample1-misclass-$*.dat\
 	                              -pm2 out/sample2-misclass-$*.dat\
 	                              -pdf out/pdf-$*.dat\
-	                              -pdb out/params-$*.dat
+	                              -pdb out/params-$*.dat | tee out/classification-rate-$*.txt
 
 out/sample-plot-%.png: out/sample1-%.dat out/sample2-%.dat out/params-%.dat  Part1-Bayes/plot.plt
 	@gnuplot -e "outfile='$@'"\
@@ -84,6 +84,7 @@ out/misclass-pdf-plot-%.png: out/pdf-%.dat out/sample1-misclass-%.dat out/sample
 # Figures needed for the report
 report: out/sample-plot-A.png out/sample-plot-B.png out/misclass-plot-A.png out/misclass-plot-B.png
 report: out/sample-pdf-plot-A.png out/sample-pdf-plot-B.png out/misclass-pdf-plot-A.png out/misclass-pdf-plot-B.png
+report: out/classification-rate-A.txt out/classification-rate-B.txt
 
 clean:
 	rm -rf $(OBJDIR)

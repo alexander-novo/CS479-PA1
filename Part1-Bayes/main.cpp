@@ -24,6 +24,21 @@ double discriminateCase2(const observation& obs, const Vec<CLASSES>& mu, const C
                          double logPrior);
 double discriminateCase3(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
                          double logPrior);
+unsigned detectCase(const array<CovMatrix, CLASSES>& vars);
+void calcInversesAndDets(unsigned discriminantCase, const array<CovMatrix, CLASSES>& vars,
+                         array<CovMatrix, CLASSES>& varInverses, array<double, CLASSES>& varDets,
+                         bool alwaysCalcDets = false);
+unsigned classifySample(unsigned discriminantCase, const sample& samp, unsigned correctClass, sample& misclass,
+                        observation& min, observation& max, const array<observation, CLASSES>& means,
+                        const array<CovMatrix, CLASSES>& varInverses, const array<double, CLASSES>& logVarDets,
+                        const array<double, CLASSES>& logPriors, bool plotMisclassifications = false);
+void printPlotFile(std::ofstream& plotFile, const sample& samp);
+double printPdfPlotFile(std::ofstream& pdfPlotFile, const observation& min, const observation& max,
+                        const array<observation, CLASSES>& means, const array<CovMatrix, CLASSES>& varInverses,
+                        const array<double, CLASSES>& varDets, const array<double, CLASSES>& logPriors);
+void printParamsFile(std::ofstream& boundaryParamsFile, const observation& min, const observation& max,
+                     const array<observation, CLASSES>& means, const array<CovMatrix, CLASSES>& varInverses,
+                     const array<double, CLASSES>& logVarDets, const array<double, CLASSES>& logPriors, double pdfMax);
 bool verifyArguments(int argc, char** argv, Arguments& arg, int& err);
 void printHelp();
 
@@ -37,13 +52,12 @@ int main(int argc, char** argv) {
 	if (!verifyArguments(argc, argv, arg, err)) { return err; }
 
 	sample misclassifications[CLASSES];
-	std::array<sample, CLASSES> samples;
-	std::array<double, CLASSES> logPriors, varDets = {}, logVarDets = {};
-	std::array<double, (DIM * (DIM + 1)) / 2 + DIM + 1> boundaryCoeffs;
-	std::array<CovMatrix, CLASSES> varInverses;
-	std::array<observation, CLASSES> means = getMeans(arg.set);
-	std::array<CovMatrix, CLASSES> vars    = getVars(arg.set);
-	std::array<unsigned, CLASSES> sizes    = getSizes(arg.set);
+	array<sample, CLASSES> samples;
+	array<double, CLASSES> logPriors, varDets = {}, logVarDets = {};
+	array<CovMatrix, CLASSES> varInverses;
+	array<observation, CLASSES> means = getMeans(arg.set);
+	array<CovMatrix, CLASSES> vars    = getVars(arg.set);
+	array<unsigned, CLASSES> sizes    = getSizes(arg.set);
 	getSamples(arg.set, samples, arg.seed);
 
 	observation min = samples[0].front(), max = samples[0].front();
@@ -56,37 +70,103 @@ int main(int argc, char** argv) {
 
 	// Compute which case we're in from the book
 	if (arg.discriminantCase == 0) {
-		// Default case is 3, since it covers all other cases as well
-		arg.discriminantCase = 3;
-
-		// If all the covariance matrices are equal, then we're in case 2
-		if (std::equal(vars.cbegin() + 1, vars.cend(), vars.cbegin())) {
-			arg.discriminantCase = 2;
-
-			// If the first covariance matrix is a constant times the identity (diagonal
-			// and all elements on the diagonal are the same number), then we're in case 1
-			if (vars[0].isDiagonal() && (vars[0].diagonal().array() == vars[0](0, 0)).all()) {
-				arg.discriminantCase = 1;
-			}
-		}
+		arg.discriminantCase = detectCase(vars);
 
 		std::cout << "Detected case " << arg.discriminantCase << "\n\n";
 	} else {
 		std::cout << "Overriden case " << arg.discriminantCase << "\n\n";
 	}
 
-	auto discriminate = discriminantFuncs[arg.discriminantCase - 1];
+	calcInversesAndDets(arg.discriminantCase, vars, varInverses, varDets, !arg.pdfPlotFile.fail());
 
-	switch (arg.discriminantCase) {
+	// Calculate the logs of the determinants
+	std::transform(varDets.cbegin(), varDets.cend(), logVarDets.begin(), [](const double& det) { return log(det); });
+
+	unsigned overallMisclass = 0;
+
+	for (unsigned i = 0; i < CLASSES; i++) {
+		sample& misclass = misclassifications[i];
+
+		unsigned misclassCount =
+		    classifySample(arg.discriminantCase, samples[i], i, misclassifications[i], min, max, means, varInverses,
+		                   logVarDets, logPriors, !arg.misclassPlotFiles[i].fail());
+
+		std::cout << "Misclassification rate for class " << i + 1 << ":\n"
+		          << misclassCount / (double) sizes[i] << "\n\n";
+
+		overallMisclass += misclassCount;
+
+		if (arg.plotFiles[i]) { printPlotFile(arg.plotFiles[i], samples[i]); }
+
+		if (arg.misclassPlotFiles[i]) { printPlotFile(arg.misclassPlotFiles[i], misclassifications[i]); }
+	}
+
+	std::cout << "Overall misclassification rate:\n" << overallMisclass / totalSize << '\n';
+
+	double pdfMax = 0;
+	if (arg.pdfPlotFile) {
+		pdfMax = printPdfPlotFile(arg.pdfPlotFile, min, max, means, varInverses, varDets, logPriors);
+
+		// Round it so that the z tick values are not so ugly
+		pdfMax = round(pdfMax * 100) / 100;
+	}
+
+	if (arg.boundaryParamsFile) {
+		printParamsFile(arg.boundaryParamsFile, min, max, means, varInverses, logVarDets, logPriors, pdfMax);
+	}
+
+	return 0;
+}
+
+#pragma region Discriminant functions
+double discriminateCase1(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
+                         double logPrior) {
+	// Note that varInverse is what is passed, and the inverse of a diagonal matrix is also a
+	// diagonal matrix with the diagonal elements being the reciprocal of the original elements. So
+	// instead of dividing by sigma^2, we multiply by 1/sigma^2.
+	return (varInverse(0, 0) * mu).dot(obs) - varInverse(0, 0) * mu.dot(mu) / 2.0 + logPrior;
+}
+
+double discriminateCase2(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
+                         double logPrior) {
+	observation inverseMu = varInverse * mu;
+	return inverseMu.dot(obs) - mu.dot(inverseMu) / 2.0 + logPrior;
+}
+
+double discriminateCase3(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
+                         double logPrior) {
+	return (obs.dot((-1 / 2.0 * varInverse) * obs) + (varInverse * mu).dot(obs)) - 1 / 2.0 * mu.dot(varInverse * mu) -
+	       logVarDet / 2.0 + logPrior;
+}
+#pragma endregion
+
+unsigned detectCase(const array<CovMatrix, CLASSES>& vars) {
+	// Default case is 3, since it covers all other cases as well
+	unsigned discriminantCase = 3;
+
+	// If all the covariance matrices are equal, then we're in case 2
+	if (std::equal(vars.cbegin() + 1, vars.cend(), vars.cbegin())) {
+		discriminantCase = 2;
+
+		// If the first covariance matrix is a scalar matrix (diagonal and all
+		// elements on the diagonal are the same number), then we're in case 1
+		if (vars[0].isDiagonal() && (vars[0].diagonal().array() == vars[0](0, 0)).all()) { discriminantCase = 1; }
+	}
+
+	return discriminantCase;
+}
+
+void calcInversesAndDets(unsigned discriminantCase, const array<CovMatrix, CLASSES>& vars,
+                         array<CovMatrix, CLASSES>& varInverses, array<double, CLASSES>& varDets, bool alwaysCalcDets) {
+	switch (discriminantCase) {
 		case 1: {
 			// Same inverse for all classes, and it's a diagonal matrix, so inverse is easy to find.
 			// No need for determinant to discriminate, but we need it if we're plotting the pdf.
-			CovMatrix inverse  = vars[0].diagonal().asDiagonal().inverse();
-			double determinant = 1;
+			CovMatrix inverse = vars[0].diagonal().asDiagonal().inverse();
 
 			// The determinant of a diagonal matrix is the product of the entries on the main diagonal.
 			// But since this is a scalar matrix, the entries are all the same so it is the power of that scalar.
-			if (arg.pdfPlotFile) { determinant = pow(vars[0](0, 0), DIM); }
+			double determinant = alwaysCalcDets ? determinant = pow(vars[0](0, 0), DIM) : 1;
 
 			std::for_each(varInverses.begin(), varInverses.end(), [&inverse](CovMatrix& inv) { inv = inverse; });
 			std::for_each(varDets.begin(), varDets.end(), [&determinant](double& det) { det = determinant; });
@@ -98,7 +178,7 @@ int main(int argc, char** argv) {
 			// inverse quickly as long as we don't need determinant (which we don't unless we're plotting the pdf).
 			CovMatrix inverse;
 			double determinant;
-			if (!arg.pdfPlotFile) {
+			if (!alwaysCalcDets) {
 				inverse     = vars[0].llt().solve(CovMatrix::Identity());
 				determinant = 1;
 			} else {
@@ -127,15 +207,14 @@ int main(int argc, char** argv) {
 			               });
 			break;
 	}
+}
 
-	// Calculate the logs of the determinants
-	std::transform(varDets.cbegin(), varDets.cend(), logVarDets.begin(), [](const double& det) { return log(det); });
-
-	unsigned overallMisclass = 0;
-
-	for (unsigned i = 0; i < CLASSES; i++) {
-		unsigned misclassCount = 0;
-		sample& misclass       = misclassifications[i];
+unsigned classifySample(unsigned discriminantCase, const sample& samp, unsigned correctClass, sample& misclass,
+                        observation& min, observation& max, const array<observation, CLASSES>& means,
+                        const array<CovMatrix, CLASSES>& varInverses, const array<double, CLASSES>& logVarDets,
+                        const array<double, CLASSES>& logPriors, bool plotMisclassifications) {
+	unsigned misclassCount = 0;
+	auto discriminate      = discriminantFuncs[discriminantCase - 1];
 
 #pragma omp declare reduction(min:observation : omp_out = omp_out.cwiseMin(omp_in)) initializer(omp_priv(omp_orig))
 #pragma omp declare reduction(max:observation : omp_out = omp_out.cwiseMax(omp_in)) initializer(omp_priv(omp_orig))
@@ -143,153 +222,39 @@ int main(int argc, char** argv) {
                               : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end())) \
     initializer(omp_priv(omp_orig))
 #pragma omp parallel for reduction(+ : misclassCount) reduction(min : min) reduction(max : max) reduction(append : misclass)
-		for (unsigned j = 0; j < samples[i].size(); j++) {
-			double maxDiscriminant = discriminate(samples[i][j], means[0], varInverses[0], logVarDets[0], logPriors[0]);
-			double discriminant;
+	for (unsigned j = 0; j < samp.size(); j++) {
+		double maxDiscriminant = discriminate(samp[j], means[0], varInverses[0], logVarDets[0], logPriors[0]);
+		double discriminant;
 
-			for (unsigned k = 1; k < CLASSES; k++) {
-				discriminant = discriminate(samples[i][j], means[k], varInverses[k], logVarDets[k], logPriors[k]);
+		for (unsigned k = 1; k < CLASSES; k++) {
+			discriminant = discriminate(samp[j], means[k], varInverses[k], logVarDets[k], logPriors[k]);
 
-				if (k == i && discriminant < maxDiscriminant || k > i && discriminant > maxDiscriminant) {
-					misclassCount++;
+			if (k == correctClass && discriminant < maxDiscriminant ||
+			    k > correctClass && discriminant > maxDiscriminant) {
+				misclassCount++;
 
-					if (arg.misclassPlotFiles[i]) { misclass.push_back(samples[i][j]); }
+				if (plotMisclassifications) { misclass.push_back(samp[j]); }
 
-					break;
-				}
-
-				maxDiscriminant = std::max(maxDiscriminant, discriminant);
+				break;
 			}
 
-			min = min.cwiseMin(samples[i][j]);
-			max = max.cwiseMax(samples[i][j]);
+			maxDiscriminant = std::max(maxDiscriminant, discriminant);
 		}
 
-		std::cout << "Misclassification rate for class " << i + 1 << ":\n"
-		          << misclassCount / (double) sizes[i] << "\n\n";
-
-		overallMisclass += misclassCount;
-
-		if (arg.plotFiles[i]) {
-			arg.plotFiles[i] << "#        x           y\n" << std::fixed << std::setprecision(7);
-
-			for (unsigned j = 0; j < samples[i].size(); j++) {
-				for (unsigned k = 0; k < DIM; k++) { arg.plotFiles[i] << std::setw(10) << samples[i][j][k] << "  "; }
-				arg.plotFiles[i] << '\n';
-			}
-		}
-
-		if (arg.misclassPlotFiles[i]) {
-			arg.misclassPlotFiles[i] << "#        x           y\n" << std::fixed << std::setprecision(7);
-
-			for (unsigned j = 0; j < misclassifications[i].size(); j++) {
-				for (unsigned k = 0; k < DIM; k++) {
-					arg.misclassPlotFiles[i] << std::setw(10) << misclassifications[i][j][k] << "  ";
-				}
-				arg.misclassPlotFiles[i] << '\n';
-			}
-		}
+		min = min.cwiseMin(samp[j]);
+		max = max.cwiseMax(samp[j]);
 	}
 
-	std::cout << "Overall misclassification rate:\n" << overallMisclass / totalSize << '\n';
+	return misclassCount;
+}
 
-	double pdfMax = 0;
-	if (arg.pdfPlotFile) {
-		std::array<double, CLASSES> varDetRoots, priors;
-		std::transform(varDets.cbegin(), varDets.cend(), varDetRoots.begin(), [](double det) { return sqrt(det); });
-		std::transform(logPriors.cbegin(), logPriors.cend(), priors.begin(),
-		               [](double logPrior) { return exp(logPrior); });
+void printPlotFile(std::ofstream& plotFile, const sample& samp) {
+	plotFile << "#        x           y\n" << std::fixed << std::setprecision(7);
 
-		arg.pdfPlotFile << "#        x           y           z       class\n" << std::fixed << std::setprecision(7);
-#pragma omp parallel for ordered collapse(2) reduction(max : pdfMax)
-		for (unsigned x = 0; x < PDF_SAMPLES; x++) {
-			for (unsigned y = 0; y < PDF_SAMPLES; y++) {
-				double xmod = min.x() + x * (max.x() - min.x()) / PDF_SAMPLES;
-				double ymod = min.y() + y * (max.y() - min.y()) / PDF_SAMPLES;
-
-				observation vecX = {xmod, ymod};
-
-				double densities[] = {gaussianDensity<DIM>(vecX, means[0], varInverses[0], varDetRoots[0]) * priors[0],
-				                      gaussianDensity<DIM>(vecX, means[1], varInverses[1], varDetRoots[1]) * priors[1]};
-
-				pdfMax = std::max(pdfMax, densities[0] + densities[1]);
-
-#pragma omp ordered
-				{
-					arg.pdfPlotFile << std::setw(10) << xmod << "  " << std::setw(10) << ymod << "  " << std::setw(10)
-					                << densities[0] + densities[1] << "  " << std::setw(10)
-					                << ((densities[0] > densities[1]) ? 1 : 2);
-
-					if (x != PDF_SAMPLES - 1 || y < PDF_SAMPLES - 1) { arg.pdfPlotFile << '\n'; }
-
-					// gnuplot requires an extra blank line between rows on surface plots
-					if (y == PDF_SAMPLES - 1 && x != PDF_SAMPLES - 1) { arg.pdfPlotFile << '\n'; }
-				}
-			}
-		}
+	for (unsigned j = 0; j < samp.size(); j++) {
+		for (unsigned k = 0; k < DIM; k++) { plotFile << std::setw(10) << samp[j][k] << "  "; }
+		plotFile << '\n';
 	}
-
-	if (arg.boundaryParamsFile) {
-		CovMatrix diffW   = -1 / 2.0 * (varInverses[0] - varInverses[1]);
-		observation diffw = varInverses[0] * means[0] - varInverses[1] * means[1];
-
-		// Terms of degree 2 first, in alphabetical order
-		// e.g. x^2 + xy + y^2,
-		// or   x^2 + xy + xz + y^2 + yz + z^2
-		for (unsigned i = 0; i < DIM; i++) {
-			// Diagonals are the coefficients on squared terms
-			boundaryCoeffs[i * DIM] = diffW(i, i);
-			// Off-Diagonals are the coefficients on non-squared terms, and since the matrix is symmetric and xy = yx,
-			// they get doubled.
-			for (unsigned j = 1; j < DIM - i; j++) { boundaryCoeffs[i * DIM + j] = 2 * diffW(i, j + i); }
-		}
-
-		// Then terms of degree 1, once again in alphabetical order
-		for (unsigned i = 0; i < DIM; i++) { boundaryCoeffs[(DIM * (DIM + 1)) / 2 + i] = diffw[i]; }
-
-		// Then finally the constant term
-		boundaryCoeffs.back() =
-		    (-1 / 2.0 * means[0].dot(varInverses[0] * means[0]) - 1 / 2.0 * logVarDets[0] + logPriors[0]) -
-		    (-1 / 2.0 * means[1].dot(varInverses[1] * means[1]) - 1 / 2.0 * logVarDets[1] + logPriors[1]);
-
-		for (unsigned i = 0; i < boundaryCoeffs.size(); i++) {
-			arg.boundaryParamsFile << std::setw(10) << (char) ('a' + i) << "  ";
-		}
-		arg.boundaryParamsFile << std::setw(10) << "xmin"
-		                       << "  " << std::setw(10) << "xmax"
-		                       << "  " << std::setw(10) << "ymin"
-		                       << "  " << std::setw(10) << "ymax"
-		                       << "  " << std::setw(10) << "zmax\n"
-		                       << std::fixed << std::setprecision(7);
-
-		for (double coeff : boundaryCoeffs) { arg.boundaryParamsFile << std::setw(10) << coeff << "  "; }
-
-		arg.boundaryParamsFile << std::setw(10) << min[0] << "  " << std::setw(10) << max[0] << "  " << std::setw(10)
-		                       << min[1] << "  " << std::setw(10) << max[1] << "  " << std::setw(10)
-		                       << round(pdfMax * 100) / 100;
-	}
-
-	return 0;
-}
-
-double discriminateCase1(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
-                         double logPrior) {
-	// Note that varInverse is what is passed, and the inverse of a diagonal matrix is also a
-	// diagonal matrix with the diagonal elements being the reciprocal of the original elements. So
-	// instead of dividing by sigma^2, we multiply by 1/sigma^2.
-	return (varInverse(0, 0) * mu).dot(obs) - varInverse(0, 0) * mu.dot(mu) / 2.0 + logPrior;
-}
-
-double discriminateCase2(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
-                         double logPrior) {
-	observation inverseMu = varInverse * mu;
-	return inverseMu.dot(obs) - mu.dot(inverseMu) / 2.0 + logPrior;
-}
-
-double discriminateCase3(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
-                         double logPrior) {
-	return (obs.dot((-1 / 2.0 * varInverse) * obs) + (varInverse * mu).dot(obs)) - 1 / 2.0 * mu.dot(varInverse * mu) -
-	       logVarDet / 2.0 + logPrior;
 }
 
 bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
@@ -440,6 +405,97 @@ bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
 		}
 	}
 	return true;
+}
+
+double printPdfPlotFile(std::ofstream& pdfPlotFile, const observation& min, const observation& max,
+                        const array<observation, CLASSES>& means, const array<CovMatrix, CLASSES>& varInverses,
+                        const array<double, CLASSES>& varDets, const array<double, CLASSES>& logPriors) {
+	double pdfMax = 0;
+	array<double, CLASSES> varDetRoots, priors;
+
+	std::transform(varDets.cbegin(), varDets.cend(), varDetRoots.begin(), [](double det) { return sqrt(det); });
+	std::transform(logPriors.cbegin(), logPriors.cend(), priors.begin(), [](double logPrior) { return exp(logPrior); });
+
+	pdfPlotFile << "#        x           y           z       class\n" << std::fixed << std::setprecision(7);
+#pragma omp parallel for ordered collapse(2) reduction(max : pdfMax)
+	for (unsigned x = 0; x < PDF_SAMPLES; x++) {
+		for (unsigned y = 0; y < PDF_SAMPLES; y++) {
+			double xmod = min.x() + x * (max.x() - min.x()) / PDF_SAMPLES;
+			double ymod = min.y() + y * (max.y() - min.y()) / PDF_SAMPLES;
+
+			observation vecX = {xmod, ymod};
+
+			array<double, CLASSES> densities;
+
+			for (unsigned i = 0; i < CLASSES; i++) {
+				densities[i] = gaussianDensity<DIM>(vecX, means[i], varInverses[i], varDetRoots[i]) * priors[i];
+			}
+
+			double jointDensity = std::accumulate(densities.cbegin(), densities.cend(), 0.);
+			unsigned correctClass =
+			    std::distance(densities.cbegin(), std::max_element(densities.cbegin(), densities.cend())) + 1;
+
+			pdfMax = std::max(pdfMax, jointDensity);
+
+#pragma omp ordered
+			{
+				pdfPlotFile << std::setw(10) << xmod << "  " << std::setw(10) << ymod << "  " << std::setw(10)
+				            << jointDensity << "  " << std::setw(10) << correctClass << '\n';
+
+				// gnuplot requires an extra blank line between rows on surface plots
+				if (y == PDF_SAMPLES - 1) { pdfPlotFile << '\n'; }
+			}
+		}
+	}
+
+	return pdfMax;
+}
+
+void printParamsFile(std::ofstream& boundaryParamsFile, const observation& min, const observation& max,
+                     const array<observation, CLASSES>& means, const array<CovMatrix, CLASSES>& varInverses,
+                     const array<double, CLASSES>& logVarDets, const array<double, CLASSES>& logPriors, double pdfMax) {
+	array<double, (DIM * (DIM + 1)) / 2 + DIM + 1> boundaryCoeffs;
+	// Corresponds to the difference in the matrices "W_i" in the book
+	CovMatrix diffW = -1 / 2.0 * (varInverses[0] - varInverses[1]);
+	// Corresponds to the difference in the vectors "w_i" in the book
+	observation diffw = varInverses[0] * means[0] - varInverses[1] * means[1];
+
+	// Terms of degree 2 first, in alphabetical order
+	// e.g. x^2 + xy + y^2,
+	// or   x^2 + xy + xz + y^2 + yz + z^2
+	for (unsigned i = 0; i < DIM; i++) {
+		// Diagonals are the coefficients on squared terms
+		boundaryCoeffs[i * DIM] = diffW(i, i);
+		// Off-Diagonals are the coefficients on non-squared terms, and since the matrix is symmetric and xy = yx,
+		// they get doubled.
+		for (unsigned j = 1; j < DIM - i; j++) { boundaryCoeffs[i * DIM + j] = 2 * diffW(i, j + i); }
+	}
+
+	// Then terms of degree 1, once again in alphabetical order
+	for (unsigned i = 0; i < DIM; i++) { boundaryCoeffs[(DIM * (DIM + 1)) / 2 + i] = diffw[i]; }
+
+	// Then finally the constant term
+	boundaryCoeffs.back() =
+	    (-1 / 2.0 * means[0].dot(varInverses[0] * means[0]) - 1 / 2.0 * logVarDets[0] + logPriors[0]) -
+	    (-1 / 2.0 * means[1].dot(varInverses[1] * means[1]) - 1 / 2.0 * logVarDets[1] + logPriors[1]);
+
+	// Print parameter headers. All coefficients are single letters in alphabetical order, starting with 'a'
+	for (unsigned i = 0; i < boundaryCoeffs.size(); i++) {
+		boundaryParamsFile << std::setw(10) << (char) ('a' + i) << "  ";
+	}
+	// Then misc. parameter headers
+	boundaryParamsFile << std::setw(10) << "xmin"
+	                   << "  " << std::setw(10) << "xmax"
+	                   << "  " << std::setw(10) << "ymin"
+	                   << "  " << std::setw(10) << "ymax"
+	                   << "  " << std::setw(10) << "zmax\n"
+	                   << std::fixed << std::setprecision(7);
+
+	// Print parameters, starting with coefficients calculated above
+	for (double coeff : boundaryCoeffs) { boundaryParamsFile << std::setw(10) << coeff << "  "; }
+	// Then misc. parameters
+	boundaryParamsFile << std::setw(10) << min[0] << "  " << std::setw(10) << max[0] << "  " << std::setw(10) << min[1]
+	                   << "  " << std::setw(10) << max[1] << "  " << std::setw(10) << pdfMax;
 }
 
 void printHelp() {

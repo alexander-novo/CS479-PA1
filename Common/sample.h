@@ -7,6 +7,7 @@
 using observation = Vec<DIM>;
 using CovMatrix   = Matrix<double, DIM, DIM>;
 using sample      = std::vector<observation, aligned_allocator<observation>>;
+using std::array;
 
 // typedef Vec<DIM> observation;
 // typedef Matrix<double, DIM, DIM> CovMatrix;
@@ -21,15 +22,15 @@ enum DataSet { A, B };
  * @param samples
  * @param seed     Seed the RNG. Keep consistent for the same samples.
  */
-void getSamples(DataSet set, std::array<sample, CLASSES>& samples, unsigned seed = 1);
+void getSamples(DataSet set, array<sample, CLASSES>& samples, unsigned seed = 1);
 
 /**
  * @brief Retrieve the means of a data set.
  *
  * @param set                                The data set to get the means of.
- * @return std::array<observation, CLASSES>  The means.
+ * @return array<observation, CLASSES>  The means.
  */
-std::array<observation, CLASSES> getMeans(DataSet set);
+array<observation, CLASSES> getMeans(DataSet set);
 
 /**
  * @brief Retrieve the variances of a data set. The covariance matrix of all samples
@@ -37,17 +38,17 @@ std::array<observation, CLASSES> getMeans(DataSet set);
  *        elements.
  *
  * @param set                              The data set to get the variances of.
- * @return std::array<CovMatrix, CLASSES>  The variances.
+ * @return array<CovMatrix, CLASSES>  The variances.
  */
-std::array<CovMatrix, CLASSES> getVars(DataSet set);
+array<CovMatrix, CLASSES> getVars(DataSet set);
 
 /**
  * @brief Retrieve the number of observations for each sample in a data set.
  *
  * @param set                             The data set to get the sizes of.
- * @return std::array<unsigned, CLASSES>  The sizes.
+ * @return array<unsigned, CLASSES>  The sizes.
  */
-std::array<unsigned, CLASSES> getSizes(DataSet set);
+array<unsigned, CLASSES> getSizes(DataSet set);
 
 /**
  * @brief Calculate the sample mean from a sample.
