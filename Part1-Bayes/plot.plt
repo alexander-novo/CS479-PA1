@@ -51,5 +51,5 @@ if(exists("raw")) {
 plot sample1 u 1:2 w circles notitle,\
      sample2 u 1:2 w circles notitle,\
 	 $ContourTable w lines lw 6 lc rgb 'black' notitle,\
-	 keyentry w circles fill solid 1.0 noborder lc 1 title "ω_1",\
-	 keyentry w circles fill solid 1.0 noborder lc 2 title "ω_2"
+	 NaN w circles fill solid 1.0 noborder lc 1 title "ω_1",\
+	 NaN w circles fill solid 1.0 noborder lc 2 title "ω_2"

@@ -59,5 +59,5 @@ splot pdfFile u 1:2:3:4 w pm3d lc rgb "black" lw 1 notitle,\
 	  sample1 u 1:2:(BASE) w points pt 6 lw 6 lc rgb "#a97570b3" notitle,\
       sample2 u 1:2:(BASE) w points pt 6 lw 6 lc rgb "#a91b9e77" notitle,\
 	  $ContourTable u 1:2:(BASE) w lines lw 6 lc rgb 'black' title "Decision Boundary",\
-	  keyentry w points pt 7 ps 16 lc rgb "#7570b3" title "ω_1",\
-	  keyentry w points pt 7 ps 16 lc rgb "#1b9e77" title "ω_2"
+	  NaN w points pt 7 ps 16 lc rgb "#7570b3" title "ω_1",\
+	  NaN w points pt 7 ps 16 lc rgb "#1b9e77" title "ω_2"
