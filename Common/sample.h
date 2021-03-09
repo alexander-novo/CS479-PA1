@@ -9,10 +9,7 @@ using CovMatrix   = Matrix<double, DIM, DIM>;
 using sample      = std::vector<observation, aligned_allocator<observation>>;
 using std::array;
 
-// typedef Vec<DIM> observation;
-// typedef Matrix<double, DIM, DIM> CovMatrix;
-// typedef std::vector<observation> sample;
-
+// The data sets from the assignment
 enum DataSet { A, B };
 
 /**
