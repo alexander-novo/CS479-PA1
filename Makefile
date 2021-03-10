@@ -36,63 +36,63 @@ Part2-Euclid/classify-euclid: $(OBJDIR)/Part2-Euclid/main.o $(OBJDIR)/Common/sam
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 ### Part 1 Outputs ###
-out/sample1-%.dat out/sample2-%.dat out/sample1-misclass-%.dat out/sample2-misclass-%.dat out/error-bound-%.dat out/params-%.dat out/pdf-%.dat out/classification-rate-%.txt: Part1-Bayes/classify-bayes | out
-	Part1-Bayes/classify-bayes $* -ps1 out/sample1-$*.dat\
-	                              -ps2 out/sample2-$*.dat\
-	                              -pm1 out/sample1-misclass-$*.dat\
-	                              -pm2 out/sample2-misclass-$*.dat\
-	                              -pdf out/pdf-$*.dat\
-								  -peb out/error-bound-$*.dat\
-	                              -pdb out/params-$*.dat | tee out/classification-rate-$*.txt
+out/bayes/sample1-%.dat out/bayes/sample2-%.dat out/bayes/sample1-misclass-%.dat out/bayes/sample2-misclass-%.dat out/bayes/error-bound-%.dat out/bayes/params-%.dat out/bayes/pdf-%.dat out/bayes/classification-rate-%.txt: Part1-Bayes/classify-bayes | out/bayes
+	Part1-Bayes/classify-bayes $* -ps1 out/bayes/sample1-$*.dat\
+	                              -ps2 out/bayes/sample2-$*.dat\
+	                              -pm1 out/bayes/sample1-misclass-$*.dat\
+	                              -pm2 out/bayes/sample2-misclass-$*.dat\
+	                              -pdf out/bayes/pdf-$*.dat\
+								  -peb out/bayes/error-bound-$*.dat\
+	                              -pdb out/bayes/params-$*.dat | tee out/bayes/classification-rate-$*.txt
 
-out/sample-plot-%.png: out/sample1-%.dat out/sample2-%.dat out/params-%.dat  Part1-Bayes/plot.plt
+out/bayes/sample-plot-%.png: out/bayes/sample1-%.dat out/bayes/sample2-%.dat out/bayes/params-%.dat  Part1-Bayes/plot.plt
 	@gnuplot -e "outfile='$@'"\
-	         -e "sample1='out/sample1-$*.dat'"\
-	         -e "sample2='out/sample2-$*.dat'"\
+	         -e "sample1='out/bayes/sample1-$*.dat'"\
+	         -e "sample2='out/bayes/sample2-$*.dat'"\
 	         -e "plotTitle='Data Set $*'"\
-	         -e "paramFile='out/params-$*.dat'"\
+	         -e "paramFile='out/bayes/params-$*.dat'"\
 	         Part1-Bayes/plot.plt
 
-out/misclass-plot-%.png: out/sample1-misclass-%.dat out/sample2-misclass-%.dat out/params-%.dat Part1-Bayes/plot.plt
+out/bayes/misclass-plot-%.png: out/bayes/sample1-misclass-%.dat out/bayes/sample2-misclass-%.dat out/bayes/params-%.dat Part1-Bayes/plot.plt
 	@gnuplot -e "outfile='$@'"\
-	         -e "sample1='out/sample1-misclass-$*.dat'"\
-	         -e "sample2='out/sample2-misclass-$*.dat'"\
+	         -e "sample1='out/bayes/sample1-misclass-$*.dat'"\
+	         -e "sample2='out/bayes/sample2-misclass-$*.dat'"\
 	         -e "plotTitle='Misclassified Observations From Data Set $*'"\
-	         -e "paramFile='out/params-$*.dat'"\
+	         -e "paramFile='out/bayes/params-$*.dat'"\
 	         Part1-Bayes/plot.plt
 
-out/sample-pdf-plot-%.png: out/pdf-%.dat out/sample1-%.dat out/sample2-%.dat out/params-%.dat Part1-Bayes/plot-pdf.plt
+out/bayes/sample-pdf-plot-%.png: out/bayes/pdf-%.dat out/bayes/sample1-%.dat out/bayes/sample2-%.dat out/bayes/params-%.dat Part1-Bayes/plot-pdf.plt
 	@gnuplot -e "outfile='$@'"\
-	         -e "pdfFile='out/pdf-$*.dat"\
+	         -e "pdfFile='out/bayes/pdf-$*.dat"\
 	         -e "plotTitle='Joint pdf and samples from Data Set $*'"\
-			 -e "sample1='out/sample1-$*.dat'"\
-             -e "sample2='out/sample2-$*.dat'"\
-			 -e "paramFile='out/params-$*.dat'"\
+			 -e "sample1='out/bayes/sample1-$*.dat'"\
+             -e "sample2='out/bayes/sample2-$*.dat'"\
+			 -e "paramFile='out/bayes/params-$*.dat'"\
 	         Part1-Bayes/plot-pdf.plt
 
-out/misclass-pdf-plot-%.png: out/pdf-%.dat out/sample1-misclass-%.dat out/sample2-misclass-%.dat out/params-%.dat Part1-Bayes/plot-pdf.plt
+out/bayes/misclass-pdf-plot-%.png: out/bayes/pdf-%.dat out/bayes/sample1-misclass-%.dat out/bayes/sample2-misclass-%.dat out/bayes/params-%.dat Part1-Bayes/plot-pdf.plt
 	@gnuplot -e "outfile='$@'"\
-	         -e "pdfFile='out/pdf-$*.dat"\
+	         -e "pdfFile='out/bayes/pdf-$*.dat"\
 	         -e "plotTitle='Joint pdf and misclassified samples from Data Set $*'"\
-			 -e "sample1='out/sample1-misclass-$*.dat'"\
-             -e "sample2='out/sample2-misclass-$*.dat'"\
-			 -e "paramFile='out/params-$*.dat'"\
+			 -e "sample1='out/bayes/sample1-misclass-$*.dat'"\
+             -e "sample2='out/bayes/sample2-misclass-$*.dat'"\
+			 -e "paramFile='out/bayes/params-$*.dat'"\
 	         Part1-Bayes/plot-pdf.plt
 
-out/error-bound-%.pdf: out/error-bound-%.dat out/params-%.dat Part1-Bayes/plot-error-bound.plt
+out/bayes/error-bound-%.pdf: out/bayes/error-bound-%.dat out/bayes/params-%.dat Part1-Bayes/plot-error-bound.plt
 	@gnuplot -e "outfile='$@'"\
 	         -e "plotTitle='Error bound function for Data Set $*'"\
-			 -e "boundFile='out/error-bound-$*.dat'"\
-			 -e "paramFile='out/params-$*.dat'"\
+			 -e "boundFile='out/bayes/error-bound-$*.dat'"\
+			 -e "paramFile='out/bayes/params-$*.dat'"\
 	         Part1-Bayes/plot-error-bound.plt
 
 ### Part 2 Outputs ###
 
 
 # Figures needed for the report
-report: out/sample-plot-A.png out/sample-plot-B.png out/misclass-plot-A.png out/misclass-plot-B.png
-report: out/sample-pdf-plot-A.png out/sample-pdf-plot-B.png out/misclass-pdf-plot-A.png out/misclass-pdf-plot-B.png
-report: out/classification-rate-A.txt out/classification-rate-B.txt make out/error-bound-A.pdf make out/error-bound-B.pdf
+report: out/bayes/sample-plot-A.png out/bayes/sample-plot-B.png out/bayes/misclass-plot-A.png out/bayes/misclass-plot-B.png
+report: out/bayes/sample-pdf-plot-A.png out/bayes/sample-pdf-plot-B.png out/bayes/misclass-pdf-plot-A.png out/bayes/misclass-pdf-plot-B.png
+report: out/bayes/classification-rate-A.txt out/bayes/classification-rate-B.txt make out/bayes/error-bound-A.pdf make out/bayes/error-bound-B.pdf
 
 clean:
 	rm -rf $(OBJDIR)
@@ -109,6 +109,6 @@ $(OBJDIR)/%.o: %.cpp $(DEPDIR)/%.d | $(DEPDIRS) $(OBJDIRS)
 	$(CXX) $(DEPFLAGS) $(INCLUDES) $(CXXFLAGS) -c $< -o $@
 
 # Make generated directories
-$(DEPDIRS) $(OBJDIRS) out: ; @mkdir -p $@
+$(DEPDIRS) $(OBJDIRS) out out/bayes out/euclid: ; @mkdir -p $@
 $(DEPFILES):
 include $(wildcard $(DEPFILES))
