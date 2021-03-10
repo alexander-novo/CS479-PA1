@@ -32,7 +32,7 @@ unset cntrparam
 set surface
 
 # set terminal pdf enhanced size 80in, 48in font "arial,80"
-set terminal pngcairo enhanced size 16000, 9600 truecolor font "arial,120"
+set terminal pngcairo enhanced size 12000, 7200 truecolor font "arial,90"
 set encoding utf8
 set output outfile
 
@@ -56,8 +56,8 @@ set ytics scale .5
 set ztics 0,(zmax/4)
 
 splot pdfFile u 1:2:3:4 w pm3d lc rgb "black" lw 1 notitle,\
-	  sample1 u 1:2:(BASE) w points pt 6 lw 6 lc rgb "#a97570b3" notitle,\
-      sample2 u 1:2:(BASE) w points pt 6 lw 6 lc rgb "#a91b9e77" notitle,\
+	  sample1 u 1:2:(BASE) w points pt 6 ps .75 lw 4.5 lc rgb "#a97570b3" notitle,\
+      sample2 u 1:2:(BASE) w points pt 6 ps .75 lw 4.5 lc rgb "#a91b9e77" notitle,\
 	  $ContourTable u 1:2:(BASE) w lines lw 6 lc rgb 'black' title "Decision Boundary",\
 	  NaN w points pt 7 ps 16 lc rgb "#7570b3" title "ω_1",\
 	  NaN w points pt 7 ps 16 lc rgb "#1b9e77" title "ω_2"
