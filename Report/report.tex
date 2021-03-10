@@ -1,6 +1,6 @@
 \documentclass[headings=optiontoheadandtoc,listof=totoc,parskip=full]{scrartcl}
 
-\usepackage{amsmath,mathtools}
+\usepackage[tbtags]{amsmath,mathtools}
 \usepackage{enumitem}
 \usepackage[margin=.75in]{geometry}
 \usepackage[headsepline]{scrlayer-scrpage}
@@ -11,6 +11,7 @@
 \usepackage{float}
 \usepackage{subcaption}
 \usepackage{physics}
+\usepackage[makeroom]{cancel}
 \usepackage[format=hang, justification=justified]{caption}
 \usepackage{subcaption}
 
@@ -52,11 +53,11 @@ While generating random vectors distributed as a standard normal distribution is
 \begin{align}
 	A_w^\top &= \qty(\Phi \Lambda^{-1/2})^\top,
 \end{align}
-where $\Sigma = \Phi \Lambda \Phi^{-1}$ is an eigendecomposition ($\Phi$ is an orthonormal matrix of eigenvectors of $\Sigma$ and $\Lambda$ is a diagonal matrix of eigenvalues of $\Sigma$) of the covariance matrix of a multivariate Gaussian distribution. Since $\Sigma$, as a covariance matrix, is a real symmetric matrix, such an eigendecomposition always exists. Applying this whitening transform to $\vec X \sim \mathcal N(\vec 0, \Sigma)$ as
+where $\Sigma = \Phi \Lambda \Phi^{-1}$ is an eigendecomposition ($\Phi$ is an orthonormal matrix of eigenvectors of $\Sigma$ and $\Lambda$ is a diagonal matrix of eigenvalues of $\Sigma$) of the covariance matrix $\Sigma$ of a multivariate Gaussian distribution. Since $\Sigma$ is a real symmetric matrix, such an eigendecomposition always exists. Applying this whitening transform to $\vec X \sim \mathcal N(\vec 0, \Sigma)$ as
 \begin{equation}
 	\vec Y = A_w^\top \vec X \label{eq:whitening}
 \end{equation}
-yields $Y \sim \mathcal N(\vec 0, A_w^\top \Sigma A_w)$ and
+yields $\vec Y \sim \mathcal N(\vec 0, A_w^\top \Sigma A_w)$ and
 \begin{align*}
 	A_w^\top \Sigma A_w &= \qty(\Phi \Lambda^{-1/2})^\top \qty(\Phi \Lambda \Phi^{-1}) \qty(\Phi \Lambda^{-1/2})\\
 		&= \qty(\Lambda^{-1/2})^\top \Phi^\top \Phi \Lambda \Lambda^{-1/2}\\
@@ -66,28 +67,167 @@ yields $Y \sim \mathcal N(\vec 0, A_w^\top \Sigma A_w)$ and
 \end{align*}
 so $Y \sim \mathcal N(\vec 0, I)$, the standard Gaussian distribution. Then by multiplying both sides of \cref{eq:whitening} by the inverse transformation
 \begin{equation}
-	\begin{aligned}
+	\begin{split}
 		\qty(A_w^\top)^{-1} &= \qty(\qty(\Phi \Lambda^{-1/2})^\top)^{-1}\\
 			&= \qty(\qty(\Phi \Lambda^{-1/2})^{-1})^\top\\
 			&= \qty(\Lambda^{1/2}\Phi^{-1})^\top\\
 			&= \Phi\Lambda^{1/2}\\
 			&= \Phi\Lambda^{1/2}\Phi^{-1}\Phi\\
-			&= \Sigma^{1/2}\Phi,
-	\end{aligned}
+			&= \Sigma^{1/2}\Phi, \label{eq:inverse-whitening}
+	\end{split}
 \end{equation}
 we arrive at
 \begin{equation}
-	\vec X = \qty(A_w^\top)^{-1} \vec Y. \label{eq:inverse-whitening}
+	\vec X = \qty(A_w^\top)^{-1} \vec Y.
 \end{equation}
 Then we can simply add $\vec \mu$ to obtain $\vec Z = \vec X + \vec \mu$ where $\vec Z \sim \mathcal N(\vec \mu, \Sigma)$ is our ''goal'' distribution.
 
 \subsubsection{Bayesian classifier for Gaussian-distributed classes}
 
+When designing a classifier, we want to pick discriminant functions for each class that indicate when we should pick that class, i.e. we should pick class $\omega_i$ if $g_i(\vec X) \geq g_j(\vec X)$ for all $j$. For a Bayesian classifier, these discriminant functions should be the probability that $\vec X$ came from the class, but any function of the discriminant that preserves this inequality (monotonic increasing functions) will also work as a discriminant. So, in the general case (referred to as ``case 3'' in the textbook) of a Bayesian classifier with multivariate Gaussian distribution, we can have (for $Y$ the class of $\vec X$)
+\begin{align*}
+	g_i(\vec x) &= \ln(P(Y = \omega_i \mid \vec X = \vec x)P(\vec X = \vec x))\\
+		&= \ln(\qty(\frac{P(\vec X = \vec x \mid Y = \omega_i)P(Y = \omega_i)}{P(\vec X = \vec x)})P(\vec X = \vec x))\\
+		&= \ln(P(\vec X = \vec x \mid Y = \omega_i)) + \ln(P(Y = \omega_i))\\
+		&= \ln(\frac{1}{(2\pi)^{1/d}|\Sigma_i|^{1/2}}\exp(-\frac{1}{2}(\vec x - \vec\mu_i)^\top \Sigma_i^{-1} (\vec x - \vec\mu_i))) + \ln(P(Y = \omega_i))\\
+		&= -\frac{1}{d}\ln(2\pi) - \frac{1}{2}\ln|\Sigma_i| - \frac{1}{2}(\vec x - \vec\mu_i)^\top \Sigma_i^{-1} (\vec x - \vec\mu_i) + \ln(P(Y = \omega_i)),
+\end{align*}
 
+which we can further refine by subtracting the constant $-\frac{1}{d}\ln(2\pi)$:
+\begin{equation}
+	g_i(\vec x) = - \frac{1}{2}\ln|\Sigma_i| - \frac{1}{2}(\vec x - \vec\mu_i)^\top \Sigma_i^{-1} (\vec x - \vec\mu_i) + \ln(P(Y = \omega_i)). \label{eq:dicriminant-case3}
+\end{equation}
+
+By further narrowing down certain cases, we can simplify this discriminant by removing other terms which become constant across classes. For instance, when $\Sigma_i = \Sigma$ (referred to as ``case 2'' in the textbook), then the $-\frac{1}{2}\ln|\Sigma_i|$ term becomes constant and we have
+\begin{align}
+	g_i(\vec x) &= -\frac{1}{2}(\vec x - \vec\mu_i)^\top \Sigma^{-1} (\vec x - \vec\mu_i) + \ln(P(Y = \omega_i)) \label{eq:dicriminant-case2-unsimplified}\\
+		&= -\frac{1}{2}(\vec x^\top - \vec\mu_i^\top)  (\Sigma^{-1}\vec x - \Sigma^{-1}\vec\mu_i) + \ln(P(Y = \omega_i)) \nonumber\\
+		&= -\frac{1}{2}(\vec x^\top(\Sigma^{-1}\vec x - \Sigma^{-1}\vec\mu_i) - \vec\mu_i^\top(\Sigma^{-1}\vec x - \Sigma^{-1}\vec\mu_i)) + \ln(P(Y = \omega_i)) \nonumber\\
+		&= -\frac{1}{2}( \cancelto{const}{\vec x^\top\Sigma^{-1}\vec x} - \vec x^\top\Sigma^{-1}\vec\mu_i - \vec\mu_i^\top\Sigma^{-1}\vec x + \vec\mu_i^\top\Sigma^{-1}\vec\mu_i) + \ln(P(Y = \omega_i)) \nonumber\\
+		&= -\frac{1}{2}(-((\Sigma^{-1}\vec\mu_i)^\top\vec x)^\top - (\Sigma^{-\top}\vec\mu_i)^\top\vec x + \vec\mu_i^\top\Sigma^{-1}\vec\mu_i) + \ln(P(Y = \omega_i)) \nonumber\\
+		&= -\frac{1}{2}(-(\Sigma^{-1}\vec\mu_i)^\top\vec x - (\Sigma^{-1}\vec\mu_i)^\top\vec x + \vec\mu_i^\top\Sigma^{-1}\vec\mu_i) + \ln(P(Y = \omega_i)) \nonumber\\
+	\shortintertext{(since $(\Sigma^{-1}\vec\mu_i)^\top\vec x$ is a scalar, and $\Sigma, \Sigma^{-1}$ are symmetric)}
+		&= (\Sigma^{-1}\vec\mu_i)^\top\vec x -\frac{1}{2}\vec\mu_i^\top\Sigma^{-1}\vec\mu_i + \ln(P(Y = \omega_i)). \label{eq:dicriminant-case2}
+\end{align}
+
+Furthermore, if $\Sigma$ is a scalar matrix $\Sigma = \sigma^2 I$ (referred to as ``case 1'' in the book), then $\Sigma^{-1} = \frac{1}{\sigma^2}$ and from \cref{eq:dicriminant-case2-unsimplified} above, we have
+\begin{equation}
+	\begin{split}
+		g_i(\vec x) &= -\frac{1}{2\sigma^2}(\vec x - \vec\mu_i)^\top(\vec x - \vec\mu_i) + \ln(P(Y = \omega_i))\\
+			&= -\frac{||\vec x - \vec\mu||}{2\sigma^2} + \ln(P(Y = \omega_i)). \label{eq:dicriminant-case1}
+	\end{split}
+\end{equation}
+
+Further simplification can be found in \cref{sec:part-2-theory}.
 
 \subsubsection{Finding the decision boundary}
 
+It is of interest to find the boundary along which the classifier changes its decision between classes. It is a defined as
+\begin{equation}
+	B = \{\vec x \mid g_i(\vec x) = g_j(\vec x) \geq g_k(\vec x) \text{ for some $i \neq j$ and all $k$}\},
+\end{equation}
+and for classifiers which are classifying between only two classes (such as the ones in this assignment), the inequality is trivially satisfied. Therefore, we're interesting in finding the roots $\vec x$ such that $g_i(\vec x) - g_j(\vec y) = 0$. Taking \cref{eq:dicriminant-case3} above (the most general case) and reorganizing it in a similar way in \cref{eq:dicriminant-case2} to separate out $\vec x$ more cleanly, we have
+\begin{align*}
+	g_i(\vec x) &= -\frac{1}{2}(\vec x - \vec\mu_i)^\top \Sigma_i^{-1} (\vec x - \vec\mu_i) -\frac{1}{2}\ln|\Sigma_i| + \ln(P(Y = \omega_i))\\
+		&= -\frac{1}{2}(\vec x^\top - \vec\mu_i^\top) (\Sigma_i^{-1}\vec x - \Sigma_i^{-1}\vec\mu_i) -\frac{1}{2}\ln|\Sigma_i| + \ln(P(Y = \omega_i))\\
+		&= -\frac{1}{2}(\vec x^\top(\Sigma_i^{-1}\vec x - \Sigma_i^{-1}\vec\mu_i) - \vec\mu_i^\top(\Sigma_i^{-1}\vec x - \Sigma_i^{-1}\vec\mu_i)) -\frac{1}{2}\ln|\Sigma_i| + \ln(P(Y = \omega_i))\\
+		&= -\frac{1}{2}(\vec x^\top\Sigma_i^{-1}\vec x - \vec x^\top\Sigma_i^{-1}\vec\mu_i - \vec\mu_i^\top\Sigma_i^{-1}\vec x + \vec\mu_i^\top\Sigma_i^{-1}\vec\mu_i) -\frac{1}{2}\ln|\Sigma_i| + \ln(P(Y = \omega_i))\\
+		&= -\frac{1}{2}\vec x^\top\Sigma_i^{-1}\vec x + (\Sigma_i^{-1}\vec\mu_i)^\top\vec x - \frac{1}{2}\vec\mu_i^\top\Sigma_i^{-1}\vec\mu_i - \frac{1}{2}\ln|\Sigma_i| + \ln(P(Y = \omega_i)),
+\end{align*}
+which gives us
+\begin{align}
+	g_i(\vec x) - g_j(\vec x) &= \vec x^\top W_{ij}\vec x + \vec w_{ij}^\top\vec x + w_{0_{ij}} = 0, \label{eq:discriminant-difference}\\
+	W_{ij} &= -\frac{1}{2}\qty(\Sigma_i^{-1} - \Sigma_j^{-1}),\\
+	\vec w_{ij} &= \Sigma_i^{-1}\vec\mu_i - \Sigma_j^{-1}\vec\mu_j,\\
+	w_{0_{ij}} &= \qty(-\frac{1}{2}\vec\mu_i^\top\Sigma_i^{-1}\vec\mu_i - \frac{1}{2}\ln|\Sigma_i| + \ln(P(Y = \omega_i))) - \nonumber\\
+	           &\mathrel{\phantom{=}} \qty(-\frac{1}{2}\vec\mu_j^\top\Sigma_j^{-1}\vec\mu_j - \frac{1}{2}\ln|\Sigma_j| + \ln(P(Y = \omega_j))).
+\end{align}
+This is in the general form of a quadric, which in two dimensions looks like
+\[
+	ax^2 + bx + cy^2 + dx + ey + f = 0,
+\]
+where
+\begin{align}
+	W_{ij} &= \begin{pmatrix}a & \frac{1}{2}b\\\frac{1}{2}b & c\end{pmatrix}, \label{eq:quadric-params-quadratic}\\
+	\vec w_{ij} &= \begin{bmatrix}d\\e\end{bmatrix}, \label{eq:quadric-params-linear}\\
+	w_{0_{ij}} &= f. \label{eq:quadric-params-constant}
+\end{align}
+
+\subsubsection{The derivative of the error bound function}
+
+When trying to minimize the error bound function for 2-class multivariate Gaussian Bayesian classifiers,
+\begin{equation}
+	\begin{split}
+		f(\beta) &= (P(Y = \omega_1))^\beta(P(Y = \omega_2))^{1 - \beta}\exp(-k(\beta)),\\
+		k(\beta) &= \frac{\beta(1 - \beta)}{2}(\vec\mu_1 - \vec\mu_2)^\top \qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1}(\vec\mu_1 - \vec\mu_2) + \frac{1}{2}\ln(\frac{|(1 - \beta)\Sigma_1 + \beta\Sigma_2|}{|\Sigma_1|^{1 - \beta}|\Sigma_2|^\beta}),
+	\end{split}
+	\label{eq:error-bound-func}
+\end{equation}
+is it useful to know the derivative, $f'(\beta)$. However, since this involves many chain rules, product rules, quotient rules, and matrix derivative rules, we should first break the derivatives up into parts. Note that
+\begin{equation}
+	\begin{split}
+		\dv{\beta}\qty[a^{f(\beta)}] &= \dv{\beta}\qty[\exp(\ln(a^{f(\beta)}))]\\
+			&= \dv{\beta}\qty[\exp(f(\beta)\ln(a))]\\
+			&= \exp(f(\beta)\ln(a)) \dv{\beta}\qty[f(\beta)\ln(a)]\\
+			&= a^{f(\beta)} \qty(\ln(a) \dv{f}{\beta}), \label{eq:diff-exp}
+	\end{split}
+\end{equation}
+\begin{equation}
+	\begin{split}
+		\dv{\beta}\qty[\qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1}] &= - \qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1} \dv{\beta}\qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2] \qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1}\\
+			&= - \qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1} \qty(-\Sigma_1 + \Sigma_2) \qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1},\label{eq:diff-inverse}
+	\end{split}
+\end{equation}
+and by Jacobi's Formula,
+\begin{equation}
+	\begin{split}
+		\dv{\beta} |(1 - \beta)\Sigma_1 + \beta\Sigma_2| &= |(1 - \beta)\Sigma_1 + \beta\Sigma_2| \tr \qty(\qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1} \dv{\beta} \qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2])\\
+			&= |(1 - \beta)\Sigma_1 + \beta\Sigma_2| \tr \qty(\qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1} \qty(-\Sigma_1 + \Sigma_2)). \label{eq:diff-det}
+	\end{split}
+\end{equation}
+Finally, if we rewrite
+\begin{align*}
+	f(\beta) &= f_1(\beta)g_1(\beta)h_1(\beta),\\
+	f_1(\beta) &= (P(Y = \omega_1))^\beta,\\
+	g_1(\beta) &= (P(Y = \omega_2))^{1 - \beta},\\
+	h_1(\beta) &= \exp(-k(\beta)),\\
+	k(\beta) &= \frac{1}{2}f_2(\beta)g_2(\beta)h_2(\beta) + \frac{1}{2}\ln(\frac{f_3(\beta)}{g_3(\beta)h_3(\beta)}),\\
+	f_2(\beta) &= \beta,\\
+	g_2(\beta) &= 1 - \beta,\\
+	h_2(\beta) &= (\vec\mu_1 - \vec\mu_2)^\top \qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1}(\vec\mu_1 - \vec\mu_2),\\
+	f_3(\beta) &= |(1 - \beta)\Sigma_1 + \beta\Sigma_2|,\\
+	g_3(\beta) &= |\Sigma_1|^{1 - \beta},\\
+	h_3(\beta) &= |\Sigma_2|^\beta,
+\end{align*}
+then we have
+
+\def \overeq #1 {\overset{\mathclap{\eqref{#1}}}{=}}
+\begin{align}
+	f'(\beta) &= f_1'(\beta)g_1(\beta)h_1(\beta) + f_1(\beta)g_1'(\beta)h_1(\beta) + f_1(\beta)g_1(\beta)h_1'(\beta), \label{eq:diff-error-bound}\\
+	f_1'(\beta) &\overeq{eq:diff-exp} (P(Y = \omega_1))^\beta\ln(P(Y = \omega_1)), \nonumber\\
+	g_1'(\beta) &\overeq{eq:diff-exp} -(P(Y = \omega_2))^{1 - \beta}\ln(P(Y = \omega_2)), \nonumber\\
+	h_1'(\beta) &= -\exp(-k(\beta))k'(\beta), \nonumber\\
+	k'(\beta) &= \frac{1}{2}f_2'(\beta)g_2(\beta)h_2(\beta) + f_2(\beta)g_2'(\beta)h_2(\beta) + f_2(\beta)g_2(\beta)h_2'(\beta)) \nonumber \nonumber\\
+		&\mathrel{\phantom{=}}+ \frac{\qty(\frac{f_3'(\beta)g_3(\beta)h_3(\beta) - f_3(\beta)g_3'(\beta)h_3(\beta) - f_3(\beta)g_3(\beta)h_3'(\beta)}{g_3(\beta)^2h_3(\beta)^2})}{2\qty(\frac{f_3(\beta)}{g_3(\beta)h_3(\beta)})}, \nonumber\\
+	f_2'(\beta) &= 1, \nonumber\\
+	g_2'(\beta) &= -1, \nonumber\\
+	h_2'(\beta) &\overeq{eq:diff-inverse} -(\vec\mu_1 - \vec\mu_2)^\top \qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1} \qty(-\Sigma_1 + \Sigma_2) \qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1}(\vec\mu_1 - \vec\mu_2), \nonumber\\
+	f_3'(\beta) &\overeq{eq:diff-det} |(1 - \beta)\Sigma_1 + \beta\Sigma_2| \tr \qty(\qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1} \qty(-\Sigma_1 + \Sigma_2)), \nonumber\\
+	g_3'(\beta) &\overeq{eq:diff-exp} -|\Sigma_1|^{1 - \beta}\ln|\Sigma_1|, \nonumber\\
+	h_3'(\beta) &\overeq{eq:diff-exp} |\Sigma_2|^\beta\ln|\Sigma_2|, \nonumber
+\end{align}
+
+
+
 \subsection{Implementation}
+
+All matrix calculations are done using the Eigen C++ library (\url{http://eigen.tuxfamily.org/}). Random standard multivariate Gaussian-distributed vectors are generated using the C++11 \texttt{<random>} library, and then the transform described in \cref{eq:inverse-whitening} is applied to get the correct distribution. Eigen provides a library (\texttt{SelfAdjointEigenSolver}) for quickly finding the eigendecomposition of symmetric matrices. This library includes a way to retrieve $\Phi$ and a way to calculate $\Sigma^{1/2}$. A classifier is then implemented by automatically detecting the case and choosing from three different discriminant functions (described in \cref{eq:dicriminant-case1,eq:dicriminant-case2,eq:dicriminant-case3}) based on the detected case. The prior probabilities for each class is calculated as the quotient of the sample size for the class and the sum of the sample sizes for all classes.
+
+The inverse variance matrices and variance determinants are pre-computed based on the case detected. If the case is 1, then the determinant is not needed and the inverse matrix is calculated by Eigen very easily using its \texttt{Diagonal} library, which presumably just finds the reciprocal of each diagonal element. If the case is 2, then the determinant is still not needed, but the matrices are now arbitrary and more difficult to find inverses for. However, since covariance matrices are symmetric positive semi-definite, we can use the Cholesky decomposition, which is provided by Eigen's \texttt{LLT} library. Finally, if the case is 3, then each covariance matrix is still positive semi-definite, but we need to calculate the determinant of each one (see \cref{eq:dicriminant-case3}), and the Cholesky decomposition does not help with that. Instead we use the LU decomposition, which gives both the matrix inverse and determinant easily via Eigen's \texttt{PartialPivLU} library, but is considerably slower than calculating the Cholesky decomposition.
+
+Then each vector generated in the sample is classified and checked against the class it was generated from. If they mismatch, the mismatch is tallied and the classifier continues until each sample is classified. The error rate is then calculated as the quotient of the number of mismatched vectors and the total number of vectors. The Bhattacharyya bound is calculated from \cref{eq:error-bound-func} with $\beta = 0.5$. Then, a hybrid iterative root-finding algorithm that uses the secant method (or the bisection method if the secant method attempts to diverge and to set the second initial guess for the secant method) with an initial guess of $\beta = 0.5$ is run on \cref{eq:diff-error-bound} to find the Chernoff Bound. This should always work since there should be only one local minimum in $(0,1)$ and $\beta = 0.5$ should be quite close. Finally, the decision boundary quadric parameters are calculated using \cref{eq:quadric-params-quadratic,eq:quadric-params-linear,eq:quadric-params-constant} and then written out into an output file, where there will be used by plotting software to plot the boundary.
+
+To make plots, \texttt{gnuplot} was used. To plot the decision boundary, \texttt{gnuplot} first plots the quadric as a surface, then finds the contour curve at $z = 0$ according to \cref{eq:discriminant-difference}. This curve is the decision boundary. In addition, the joint pdf is pre-calculated and each point on the surface is classified according to the more likely class. This is included as a surface which lies above the sample scatter plots and decision boundary to illustrate that the decision boundary lines up with which class is actually more likely at each point.
 
 \subsection{Results and Discussion}
 
