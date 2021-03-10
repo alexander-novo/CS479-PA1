@@ -96,46 +96,46 @@ out/sample1-%.dat out/sample2-%.dat out/sample1-misclass-%.dat out/sample2-miscl
 								  -peb out/error-bound-$*.dat\
 	                              -pdb out/params-$*.dat | tee out/classification-rate-$*.txt
 
-out/sample-plot-%.png: out/sample1-%.dat out/sample2-%.dat out/params-%.dat  Part1-Bayes/plot.plt
+out/sample-plot-%.png: out/sample1-%.dat out/sample2-%.dat out/params-%.dat  Part1-Euclid/plot.plt
 	@gnuplot -e "outfile='$@'"\
 	         -e "sample1='out/sample1-$*.dat'"\
 	         -e "sample2='out/sample2-$*.dat'"\
 	         -e "plotTitle='Data Set $*'"\
 	         -e "paramFile='out/params-$*.dat'"\
-	         Part1-Bayes/plot.plt
+	         Part1-Euclid/plot.plt
 
-out/misclass-plot-%.png: out/sample1-misclass-%.dat out/sample2-misclass-%.dat out/params-%.dat Part1-Bayes/plot.plt
+out/misclass-plot-%.png: out/sample1-misclass-%.dat out/sample2-misclass-%.dat out/params-%.dat Part1-Euclid/plot.plt
 	@gnuplot -e "outfile='$@'"\
 	         -e "sample1='out/sample1-misclass-$*.dat'"\
 	         -e "sample2='out/sample2-misclass-$*.dat'"\
 	         -e "plotTitle='Misclassified Observations From Data Set $*'"\
 	         -e "paramFile='out/params-$*.dat'"\
-	         Part1-Bayes/plot.plt
+	         Part1-Euclid/plot.plt
 
-out/sample-pdf-plot-%.png: out/pdf-%.dat out/sample1-%.dat out/sample2-%.dat out/params-%.dat Part1-Bayes/plot-pdf.plt
+out/sample-pdf-plot-%.png: out/pdf-%.dat out/sample1-%.dat out/sample2-%.dat out/params-%.dat Part1-Euclid/plot-pdf.plt
 	@gnuplot -e "outfile='$@'"\
 	         -e "pdfFile='out/pdf-$*.dat"\
 	         -e "plotTitle='Joint pdf and samples from Data Set $*'"\
 			 -e "sample1='out/sample1-$*.dat'"\
              -e "sample2='out/sample2-$*.dat'"\
 			 -e "paramFile='out/params-$*.dat'"\
-	         Part1-Bayes/plot-pdf.plt
+	         Part1-Euclid/plot-pdf.plt
 
-out/misclass-pdf-plot-%.png: out/pdf-%.dat out/sample1-misclass-%.dat out/sample2-misclass-%.dat out/params-%.dat Part1-Bayes/plot-pdf.plt
+out/misclass-pdf-plot-%.png: out/pdf-%.dat out/sample1-misclass-%.dat out/sample2-misclass-%.dat out/params-%.dat Part1-Euclid/plot-pdf.plt
 	@gnuplot -e "outfile='$@'"\
 	         -e "pdfFile='out/pdf-$*.dat"\
 	         -e "plotTitle='Joint pdf and misclassified samples from Data Set $*'"\
 			 -e "sample1='out/sample1-misclass-$*.dat'"\
              -e "sample2='out/sample2-misclass-$*.dat'"\
 			 -e "paramFile='out/params-$*.dat'"\
-	         Part1-Bayes/plot-pdf.plt
+	         Part1-Euclid/plot-pdf.plt
 
-out/error-bound-%.pdf: out/error-bound-%.dat out/params-%.dat Part1-Bayes/plot-error-bound.plt
+out/error-bound-%.pdf: out/error-bound-%.dat out/params-%.dat Part1-Euclid/plot-error-bound.plt
 	@gnuplot -e "outfile='$@'"\
 	         -e "plotTitle='Error bound function for Data Set $*'"\
 			 -e "boundFile='out/error-bound-$*.dat'"\
 			 -e "paramFile='out/params-$*.dat'"\
-	         Part1-Bayes/plot-error-bound.plt
+	         Part1-Euclid/plot-error-bound.plt
 
 # Figures needed for the report
 report: out/sample-plot-A.png out/sample-plot-B.png out/misclass-plot-A.png out/misclass-plot-B.png
