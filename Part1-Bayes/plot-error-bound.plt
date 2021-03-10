@@ -9,12 +9,12 @@ do for [i = 1:paramCount] {
 	eval(word(paramNames, i).' = '.word(paramLine, i))
 }
 
-set terminal pdf enhanced size 8in, 8in
+set terminal pdf enhanced size 8in, 4.8in
 set encoding utf8
 set output outfile
 
 set autoscale fix
-set yrange [0:* < .5]
+set yrange [0:* < .3]
 
 set title plotTitle
 set arrow from 0.,boundB to 0.5,boundB      nohead lc rgb "black" dashtype 2

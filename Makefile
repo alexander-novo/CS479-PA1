@@ -24,6 +24,7 @@ DEPDIRS      = $(addprefix $(DEPDIR)/, $(SOURCEDIRS))
 DEPFILES     = $(SOURCES:%.cpp=$(DEPDIR)/%.d)
 
 .PHONY: all clean report
+.SECONDARY:
 
 # By default, make all executable targets and the outputs required for the homework
 all: $(EXEC) $(REQUIRED_OUT)

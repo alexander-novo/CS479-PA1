@@ -42,3 +42,15 @@ std::array<unsigned, CLASSES> getSizes(DataSet set) {
 			return {100'000, 100'000};
 	}
 }
+
+std::string dataSetName(DataSet set) {
+	using namespace std::string_literals;
+	switch (set) {
+		case DataSet::A:
+			return "A"s;
+		case DataSet::B:
+			return "B"s;
+		default:
+			return "Undefined"s;
+	}
+}

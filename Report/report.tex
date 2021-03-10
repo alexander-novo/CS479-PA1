@@ -14,12 +14,23 @@
 \usepackage[makeroom]{cancel}
 \usepackage[format=hang, justification=justified]{caption}
 \usepackage{subcaption}
+\usepackage{listings}
+\usepackage{xcolor}
 
 \usepackage{cleveref} % Needs to be loaded last
 
 \hypersetup{
 	linktoc = all,
 	pdfborder = {0 0 .5 [ 1 3 ]}
+}
+
+\definecolor{lightgray}{gray}{0.97}
+\lstdefinestyle{out}{
+	basicstyle=\fontsize{9}{11}\ttfamily,
+	tabsize=4,
+	backgroundcolor=\color{lightgray},
+	morecomment=[l][\color{OliveGreen}]{\#},
+	numbers=none
 }
 
 \DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
@@ -214,14 +225,14 @@ then we have
 	h_2'(\beta) &\overeq{eq:diff-inverse} -(\vec\mu_1 - \vec\mu_2)^\top \qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1} \qty(-\Sigma_1 + \Sigma_2) \qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1}(\vec\mu_1 - \vec\mu_2), \nonumber\\
 	f_3'(\beta) &\overeq{eq:diff-det} |(1 - \beta)\Sigma_1 + \beta\Sigma_2| \tr \qty(\qty[(1 - \beta)\Sigma_1 + \beta\Sigma_2]^{-1} \qty(-\Sigma_1 + \Sigma_2)), \nonumber\\
 	g_3'(\beta) &\overeq{eq:diff-exp} -|\Sigma_1|^{1 - \beta}\ln|\Sigma_1|, \nonumber\\
-	h_3'(\beta) &\overeq{eq:diff-exp} |\Sigma_2|^\beta\ln|\Sigma_2|, \nonumber
+	h_3'(\beta) &\overeq{eq:diff-exp} |\Sigma_2|^\beta\ln|\Sigma_2|. \nonumber
 \end{align}
-
-
 
 \subsection{Implementation}
 
-All matrix calculations are done using the Eigen C++ library (\url{http://eigen.tuxfamily.org/}). Random standard multivariate Gaussian-distributed vectors are generated using the C++11 \texttt{<random>} library, and then the transform described in \cref{eq:inverse-whitening} is applied to get the correct distribution. Eigen provides a library (\texttt{SelfAdjointEigenSolver}) for quickly finding the eigendecomposition of symmetric matrices. This library includes a way to retrieve $\Phi$ and a way to calculate $\Sigma^{1/2}$. A classifier is then implemented by automatically detecting the case and choosing from three different discriminant functions (described in \cref{eq:dicriminant-case1,eq:dicriminant-case2,eq:dicriminant-case3}) based on the detected case. The prior probabilities for each class is calculated as the quotient of the sample size for the class and the sum of the sample sizes for all classes.
+All matrix calculations are done using the Eigen C++ library (\url{http://eigen.tuxfamily.org/}). Random standard multivariate Gaussian-distributed vectors are generated using the C++11 \texttt{<random>} library, and then the transform described in \cref{eq:inverse-whitening} is applied to get the correct distribution. Eigen provides a library (\texttt{SelfAdjointEigenSolver}) for quickly finding the eigendecomposition of symmetric matrices. This library includes a way to retrieve $\Phi$ and a way to calculate $\Sigma^{1/2}$.
+
+A classifier is then implemented by automatically detecting the case and choosing from three different discriminant functions (described in \cref{eq:dicriminant-case1,eq:dicriminant-case2,eq:dicriminant-case3}) based on the detected case. The prior probabilities for each class is calculated as the quotient of the sample size for the class and the sum of the sample sizes for all classes.
 
 The inverse variance matrices and variance determinants are pre-computed based on the case detected. If the case is 1, then the determinant is not needed and the inverse matrix is calculated by Eigen very easily using its \texttt{Diagonal} library, which presumably just finds the reciprocal of each diagonal element. If the case is 2, then the determinant is still not needed, but the matrices are now arbitrary and more difficult to find inverses for. However, since covariance matrices are symmetric positive semi-definite, we can use the Cholesky decomposition, which is provided by Eigen's \texttt{LLT} library. Finally, if the case is 3, then each covariance matrix is still positive semi-definite, but we need to calculate the determinant of each one (see \cref{eq:dicriminant-case3}), and the Cholesky decomposition does not help with that. Instead we use the LU decomposition, which gives both the matrix inverse and determinant easily via Eigen's \texttt{PartialPivLU} library, but is considerably slower than calculating the Cholesky decomposition.
 
@@ -230,6 +241,70 @@ Then each vector generated in the sample is classified and checked against the c
 To make plots, \texttt{gnuplot} was used. To plot the decision boundary, \texttt{gnuplot} first plots the quadric as a surface, then finds the contour curve at $z = 0$ according to \cref{eq:discriminant-difference}. This curve is the decision boundary. In addition, the joint pdf is pre-calculated and each point on the surface is classified according to the more likely class. This is included as a surface which lies above the sample scatter plots and decision boundary to illustrate that the decision boundary lines up with which class is actually more likely at each point.
 
 \subsection{Results and Discussion}
+
+\subsubsection{Data Set A}
+
+The results of classifying data set A can be found in \cref{lst:output-set-a-bayes}. We can see that the misclassification rate for class 1 is significantly higher than the misclassification rate for class 2 - this is due to the prior probability of class 1 being lower than the prior probability of class 2, so the Bayes classifier is correctly trading higher classification error from class 1 into more classification error reduction from class 2. Also, the overall misclassification rate is correctly much lower than both the Bhattacharyya bound and the Chernoff bound, although the Chernoff bound does not improve on the Bhattacharyya bound that much.
+
+\lstinputlisting[style=out, caption={Output from classifying data set A.}, label={lst:output-set-a-bayes}]{../out/bayes/classification-rate-A.txt}
+
+A plot of the samples generated as well as the misclassified points can be found in \cref{fig:sample-pdf-A-bayes,fig:misclass-pdf-A-bayes}, respectively. Note that the decision boundary agrees with both the misclassified points (as each class only has misclassified points on one side of the boundary) and the colored boundary along the joint pdf, where the most likely class changes.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.85\textwidth]{../out/bayes/sample-pdf-plot-A.png}
+	\caption{A plot of the samples from Data Set A, the classification boundary, and the joint pdf. The joint pdf is colored according to which class is more likely at that point.}
+	\label{fig:sample-pdf-A-bayes}
+\end{figure}
+
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.85\textwidth]{../out/bayes/misclass-pdf-plot-A.png}
+	\caption{A plot of the misclassified points from Data Set A. Note that each class only has misclassified points on one side of the boundary.}
+	\label{fig:misclass-pdf-A-bayes}
+\end{figure}
+
+A plot of the error bound function from \cref{eq:error-bound-func} can be found in \cref{fig:error-bound-A}. Note that the Chernoff bound is only slightly lower than the Bhattacharyya bound, but $\beta^*$ is correctly placed at the root $f'(\beta^*) = 0$, implying that the Chernoff bound is indeed the minimum.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.85\textwidth]{../out/bayes/error-bound-A.pdf}
+	\caption{A plot of the error bound function $f(\beta)$ for sample A. Both the Bhattacharyya bound and the Chernoff bound (at $\beta^*$) are marked.}
+	\label{fig:error-bound-A}
+\end{figure}
+
+\subsubsection{Data Set B}
+
+The results of classifying data set B can be found in \cref{lst:output-set-b-bayes}. Note that the covariance matrices of the different classes are different, so the classifier correctly chooses case 3. Once again, the misclassification rate for class 1 is much higher than the misclassification rate for class 2 due to the disparity in prior probability. The disparity is even larger in data set B than data set A, so the difference in error rate is also larger. Once again, the overall misclassification rate is much lower than both theoretical bounds, and this time the difference between the Chernoff bound and the Bhattacharyya bound is just about unnoticeable.
+
+\lstinputlisting[style=out, caption={Output from classifying data set B.}, label={lst:output-set-b-bayes}]{../out/bayes/classification-rate-B.txt}
+
+A plot of the samples generated as well as the misclassified points can be found in \cref{fig:sample-pdf-B-bayes,fig:misclass-pdf-B-bayes}, respectively. Note that the decision boundary is elliptical this time - this is due to the fact that the case 3 discriminant was used. It once again agrees with the misclassified points and the joint pdf.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.85\textwidth]{../out/bayes/sample-pdf-plot-B.png}
+	\caption{A plot of the samples from Data Set B, the classification boundary, and the joint pdf. The joint pdf is colored according to which class is more likely at that point.}
+	\label{fig:sample-pdf-B-bayes}
+\end{figure}
+
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.85\textwidth]{../out/bayes/misclass-pdf-plot-B.png}
+	\caption{A plot of the misclassified points from Data Set B. Note that each class only has misclassified points on one side of the boundary.}
+	\label{fig:misclass-pdf-B-bayes}
+\end{figure}
+
+A plot of the error bound function from \cref{eq:error-bound-func} can be found in \cref{fig:error-bound-B}. The Chernoff bound is imperceptibly lower than the Bhattacharyya bound, but once again $\beta^*$ is placed correctly at the zero-crossing of $f'(\beta)$.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.85\textwidth]{../out/bayes/error-bound-B.pdf}
+	\caption{A plot of the error bound function $f(\beta)$ for sample B. Both the Bhattacharyya bound and the Chernoff bound (at $\beta^*$) are marked.}
+	\label{fig:error-bound-B}
+\end{figure}
 
 
 %%%%%%%%%%%%%%%%%%%%%%

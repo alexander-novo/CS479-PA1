@@ -27,6 +27,8 @@ int main(int argc, char** argv) {
 		               return log(prior);
 	               });
 
+	std::cout << "Classifying data set \"" << dataSetName(arg.set) << "\" - " << CLASSES << " classes.\n";
+
 	// Compute which case we're in from the book
 	if (arg.discriminantCase == 0) {
 		arg.discriminantCase = detectCase(vars);
@@ -36,6 +38,10 @@ int main(int argc, char** argv) {
 		std::cout << "Overriden case " << arg.discriminantCase << "\n\n";
 	}
 
+	std::cout << "Prior probabilities:\n";
+	std::for_each(priors.begin(), priors.end(), [](double prior) { std::cout << prior << '\n'; });
+	std::cout << '\n';
+
 	calcInversesAndDets(arg.discriminantCase, vars, varInverses, varDets, !arg.pdfPlotFile.fail());
 
 	// Calculate the logs of the determinants
@@ -43,6 +49,7 @@ int main(int argc, char** argv) {
 
 	unsigned overallMisclass = 0;
 
+	std::cout << "Misclassification rates:\n";
 	for (unsigned i = 0; i < CLASSES; i++) {
 		sample& misclass = misclassifications[i];
 
@@ -50,8 +57,7 @@ int main(int argc, char** argv) {
 		    classifySample(arg.discriminantCase, samples[i], i, misclassifications[i], min, max, means, varInverses,
 		                   logVarDets, logPriors, !arg.misclassPlotFiles[i].fail());
 
-		std::cout << "Misclassification rate for class " << i + 1 << ":\n"
-		          << misclassCount / (double) sizes[i] << "\n\n";
+		std::cout << misclassCount / (double) sizes[i] << "\n";
 
 		overallMisclass += misclassCount;
 
@@ -60,7 +66,7 @@ int main(int argc, char** argv) {
 		if (arg.misclassPlotFiles[i]) { printPlotFile(arg.misclassPlotFiles[i], misclassifications[i]); }
 	}
 
-	std::cout << "Overall misclassification rate:\n" << overallMisclass / totalSize << "\n\n";
+	std::cout << "\nOverall misclassification rate:\n" << overallMisclass / totalSize << "\n\n";
 
 	double bhattacharyyaBound = errorBoundFunc(.5, means, vars, varDets, priors);
 	double chernoffBound;
@@ -115,11 +121,7 @@ int main(int argc, char** argv) {
 	std::cout << "Bhattacharyya Bound:\n"
 	          << bhattacharyyaBound << "\n\n"
 	          << "Chernoff Bound:\n"
-	          << chernoffBound << " @ beta = " << guess[1] << "\n\n"
-	          << "Number of iterations required to find Chernoff Bound:\n"
-	          << iters << "\n\n"
-	          << "Epsilon:\n"
-	          << abs(prospectiveBoundVal) << "\n";
+	          << chernoffBound << " @ beta = " << guess[1] << "\n\n";
 
 	if (arg.errorBoundFile) { printErrorBoundFile(arg.errorBoundFile, means, vars, varDets, priors); }
 

@@ -48,6 +48,14 @@ array<CovMatrix, CLASSES> getVars(DataSet set);
 array<unsigned, CLASSES> getSizes(DataSet set);
 
 /**
+ * @brief Retrieve the name of the data set in string form
+ *
+ * @param set           The data set to get the name of
+ * @return std::string  The name of the data set
+ */
+std::string dataSetName(DataSet set);
+
+/**
  * @brief Calculate the sample mean from a sample.
  *
  * @tparam N       The number of features in the sample.
