@@ -28,7 +28,7 @@ unset contour
 
 
 # set terminal pdf enhanced size 8in, 4.8in
-set terminal png enhanced size 8000, 4800 truecolor font "arial,90"
+set terminal png enhanced size 4000, 2400 truecolor font "arial,90"
 set encoding utf8
 set output outfile
 

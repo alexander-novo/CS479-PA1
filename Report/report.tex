@@ -41,7 +41,7 @@
 
 \title{Programming Assignment 1}
 \subtitle{CS 474\\\url{https://github.com/alexander-novo/CS479-PA1}}
-\author{Nikhil Khedekar\\10\% Code, 0\% Report\\ Parts 3,4 \and Mehar Mangat\\0\% Code,  50\% Report\\ Parts 3,4  \and Alexander Novotny\\90\% Code, 50\% Report\\ Parts 1,2}
+\author{Nikhil Khedekar\\10\% Code, 0\% Report\\ Parts 3,4 \and Mehar Mangat\\0\% Code,  10\% Report\\ Error Checking  \and Alexander Novotny\\90\% Code, 90\% Report\\ Parts 1,2,3,4}
 \date{Due: March 10, 2021 \\ Submitted: \today}
 
 \begin{document}
@@ -125,7 +125,7 @@ Furthermore, if $\Sigma$ is a scalar matrix $\Sigma = \sigma^2 I$ (referred to a
 \begin{equation}
 	\begin{split}
 		g_i(\vec x) &= -\frac{1}{2\sigma^2}(\vec x - \vec\mu_i)^\top(\vec x - \vec\mu_i) + \ln(P(Y = \omega_i))\\
-			&= -\frac{||\vec x - \vec\mu||}{2\sigma^2} + \ln(P(Y = \omega_i)). \label{eq:dicriminant-case1}
+			&= -\frac{||\vec x - \vec\mu_i||^2}{2\sigma^2} + \ln(P(Y = \omega_i)). \label{eq:dicriminant-case1}
 	\end{split}
 \end{equation}
 
@@ -174,7 +174,7 @@ When trying to minimize the error bound function for 2-class multivariate Gaussi
 	\end{split}
 	\label{eq:error-bound-func}
 \end{equation}
-is it useful to know the derivative, $f'(\beta)$. However, since this involves many chain rules, product rules, quotient rules, and matrix derivative rules, we should first break the derivatives up into parts. Note that
+it is useful to know the derivative, $f'(\beta)$. However, since this involves many chain rules, product rules, quotient rules, and matrix derivative rules, we should first break the derivatives up into parts. Note that
 \begin{equation}
 	\begin{split}
 		\dv{\beta}\qty[a^{f(\beta)}] &= \dv{\beta}\qty[\exp(\ln(a^{f(\beta)}))]\\
@@ -229,6 +229,7 @@ then we have
 \end{align}
 
 \subsection{Implementation}
+\label{sec:part-1-impl}
 
 All matrix calculations are done using the Eigen C++ library (\url{http://eigen.tuxfamily.org/}). Random standard multivariate Gaussian-distributed vectors are generated using the C++11 \texttt{<random>} library, and then the transform described in \cref{eq:inverse-whitening} is applied to get the correct distribution. Eigen provides a library (\texttt{SelfAdjointEigenSolver}) for quickly finding the eigendecomposition of symmetric matrices. This library includes a way to retrieve $\Phi$ and a way to calculate $\Sigma^{1/2}$.
 
@@ -315,9 +316,16 @@ A plot of the error bound function from \cref{eq:error-bound-func} can be found 
 \subsection{Theory}
 \label{sec:part-2-theory}
 
+Continuing on from \cref{eq:dicriminant-case1}, if the prior probabilities $P(Y = \omega_i)$ are the same for all classes $\omega_i$, then they, the variance $\sigma^2$, and the squared norm are all constant (with respect to $i$) increasing functions (with respect to $g_i(\vec x)$) and can be removed, leading us to the discriminant
+\begin{equation}
+	g_i(\vec x) = -||\vec x - \vec\mu_i||, \label{eq:euclidean-distance-discriminant}
+\end{equation}
+the so-called ``Euclidean distance'' classifier, as it primarily involves using the Euclidean norm $||\cdot||$.
+
 \subsection{Implementation}
 \label{sec:part-2-impl}
 
+The implementation for these parts are mostly similar to the implementation for the previous parts (as described in \cref{sec:part-1-impl}), except any reference to cases, covariance matrices, and priors were removed, as the Euclidean distance classifier does not need any of these details. The error bounds checking sections were also removed, as they were not required for these parts. Instead, a single discriminant function implementing \cref{eq:euclidean-distance-discriminant} was used. Decision boundary code was kept the same, except an assumption was made about all priors and variances being equal.
 
 \subsection{Results and Discussion}
 

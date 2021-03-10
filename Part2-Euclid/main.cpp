@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
 
 double discriminate(const observation& obs, const Vec<CLASSES>& mu, double sigmaSquared) {
 	// Euclidean Distance
-	return (mu).dot(obs) / sigmaSquared - mu.dot(mu) / 2.0 / sigmaSquared;
+	return -(obs - mu).norm();
 }
 
 unsigned classifySample(const sample& samp, unsigned correctClass, sample& misclass, observation& min, observation& max,
