@@ -162,6 +162,6 @@ $(OBJDIR)/%.o: %.cpp $(DEPDIR)/%.d | $(DEPDIRS) $(OBJDIRS)
 	$(CXX) $(DEPFLAGS) $(INCLUDES) $(CXXFLAGS) -c $< -o $@
 
 # Make generated directories
-$(DEPDIRS) $(OBJDIRS) out out/bayes out/euclid : ; @mkdir -p $@
+$(DEPDIRS) $(OBJDIRS) out out/bayes out/euclid: ; @mkdir -p $@
 $(DEPFILES):
 include $(wildcard $(DEPFILES))
