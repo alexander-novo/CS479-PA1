@@ -87,13 +87,11 @@ out/bayes/error-bound-%.pdf: out/bayes/error-bound-%.dat out/bayes/params-%.dat 
 	         Part1-Bayes/plot-error-bound.plt
 
 ### Part 2 Outputs ###
-out/euclid/sample1-%.dat out/euclid/sample2-%.dat out/euclid/sample1-misclass-%.dat out/euclid/sample2-misclass-%.dat out/euclid/error-bound-%.dat out/euclid/params-%.dat out/euclid/pdf-%.dat out/euclid/classification-rate-%.txt: Part2-Euclid/classify-euclid | out/euclid
+out/euclid/sample1-%.dat out/euclid/sample2-%.dat out/euclid/sample1-misclass-%.dat out/euclid/sample2-misclass-%.dat out/euclid/params-%.dat out/euclid/classification-rate-%.txt: Part2-Euclid/classify-euclid | out/euclid
 	Part2-Euclid/classify-euclid $* -ps1 out/euclid/sample1-$*.dat\
 	                              -ps2 out/euclid/sample2-$*.dat\
 	                              -pm1 out/euclid/sample1-misclass-$*.dat\
 	                              -pm2 out/euclid/sample2-misclass-$*.dat\
-	                              -pdf out/euclid/pdf-$*.dat\
-								  -peb out/euclid/error-bound-$*.dat\
 	                              -pdb out/euclid/params-$*.dat | tee out/euclid/classification-rate-$*.txt
 
 out/euclid/sample-plot-%.png: out/euclid/sample1-%.dat out/euclid/sample2-%.dat out/euclid/params-%.dat  Part2-Euclid/plot.plt
@@ -112,31 +110,6 @@ out/euclid/misclass-plot-%.png: out/euclid/sample1-misclass-%.dat out/euclid/sam
 	         -e "paramFile='out/euclid/params-$*.dat'"\
 	         Part2-Euclid/plot.plt
 
-out/euclid/sample-pdf-plot-%.png: out/euclid/pdf-%.dat out/euclid/sample1-%.dat out/euclid/sample2-%.dat out/euclid/params-%.dat Part2-Euclid/plot-pdf.plt
-	@gnuplot -e "outfile='$@'"\
-	         -e "pdfFile='out/euclid/pdf-$*.dat"\
-	         -e "plotTitle='Joint pdf and samples from Data Set $*'"\
-			 -e "sample1='out/euclid/sample1-$*.dat'"\
-             -e "sample2='out/euclid/sample2-$*.dat'"\
-			 -e "paramFile='out/euclid/params-$*.dat'"\
-	         Part2-Euclid/plot-pdf.plt
-
-out/euclid/misclass-pdf-plot-%.png: out/euclid/pdf-%.dat out/euclid/sample1-misclass-%.dat out/euclid/sample2-misclass-%.dat out/euclid/params-%.dat Part2-Euclid/plot-pdf.plt
-	@gnuplot -e "outfile='$@'"\
-	         -e "pdfFile='out/euclid/pdf-$*.dat"\
-	         -e "plotTitle='Joint pdf and misclassified samples from Data Set $*'"\
-			 -e "sample1='out/euclid/sample1-misclass-$*.dat'"\
-             -e "sample2='out/euclid/sample2-misclass-$*.dat'"\
-			 -e "paramFile='out/euclid/params-$*.dat'"\
-	         Part2-Euclid/plot-pdf.plt
-
-out/euclid/error-bound-%.pdf: out/euclid/error-bound-%.dat out/euclid/params-%.dat Part2-Euclid/plot-error-bound.plt
-	@gnuplot -e "outfile='$@'"\
-	         -e "plotTitle='Error bound function for Data Set $*'"\
-			 -e "boundFile='out/euclid/error-bound-$*.dat'"\
-			 -e "paramFile='out/euclid/params-$*.dat'"\
-	         Part2-Euclid/plot-error-bound.plt
-
 # Figures needed for the report
 # Part 1
 report: out/bayes/sample-plot-A.png out/bayes/sample-plot-B.png out/bayes/misclass-plot-A.png out/bayes/misclass-plot-B.png
@@ -144,8 +117,7 @@ report: out/bayes/sample-pdf-plot-A.png out/bayes/sample-pdf-plot-B.png out/baye
 report: out/bayes/classification-rate-A.txt out/bayes/classification-rate-B.txt out/bayes/error-bound-A.pdf out/bayes/error-bound-B.pdf
 # Part 2
 report: out/euclid/sample-plot-A.png out/euclid/sample-plot-B.png out/euclid/misclass-plot-A.png out/euclid/misclass-plot-B.png
-report: out/euclid/sample-pdf-plot-A.png out/euclid/sample-pdf-plot-B.png out/euclid/misclass-pdf-plot-A.png out/euclid/misclass-pdf-plot-B.png
-report: out/euclid/classification-rate-A.txt out/euclid/classification-rate-B.txt out/euclid/error-bound-A.pdf out/euclid/error-bound-B.pdf
+report: out/euclid/classification-rate-A.txt out/euclid/classification-rate-B.txt
 
 clean:
 	rm -rf $(OBJDIR)
