@@ -140,7 +140,7 @@ out/error-bound-%.pdf: out/error-bound-%.dat out/params-%.dat Part1-Bayes/plot-e
 # Figures needed for the report
 report: out/sample-plot-A.png out/sample-plot-B.png out/misclass-plot-A.png out/misclass-plot-B.png
 report: out/sample-pdf-plot-A.png out/sample-pdf-plot-B.png out/misclass-pdf-plot-A.png out/misclass-pdf-plot-B.png
-report: out/classification-rate-A.txt out/classification-rate-B.txt make out/error-bound-A.pdf make out/error-bound-B.pdf
+report: out/classification-rate-A.txt out/classification-rate-B.txt out/error-bound-A.pdf out/error-bound-B.pdf
 
 clean:
 	rm -rf $(OBJDIR)
