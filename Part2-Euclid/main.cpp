@@ -1,42 +1,5 @@
-// Part2-Euclid/main.cpp
-#include <Eigen/Core>
-#include <algorithm>
-#include <cstring>
-#include <fstream>
-#include <iostream>
-#include <regex>
-
-#include "../Common/sample.h"
-
-#define PDF_SAMPLES 100
-
-// Struct for inputting arguments from command line
-struct Arguments {
-	DataSet set;
-	unsigned seed             = 1;
-	unsigned discriminantCase = 0;
-	std::ofstream plotFiles[CLASSES], misclassPlotFiles[CLASSES], boundaryParamsFile, pdfPlotFile;
-};
-
-double discriminate(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
-                         double logPrior);
-unsigned detectCase(const array<CovMatrix, CLASSES>& vars);
-void calcInversesAndDets(unsigned discriminantCase, const array<CovMatrix, CLASSES>& vars,
-                         array<CovMatrix, CLASSES>& varInverses, array<double, CLASSES>& varDets,
-                         bool alwaysCalcDets = false);
-unsigned classifySample(unsigned discriminantCase, const sample& samp, unsigned correctClass, sample& misclass,
-                        observation& min, observation& max, const array<observation, CLASSES>& means,
-                        const array<CovMatrix, CLASSES>& varInverses, const array<double, CLASSES>& logVarDets,
-                        const array<double, CLASSES>& logPriors, bool plotMisclassifications = false);
-void printPlotFile(std::ofstream& plotFile, const sample& samp);
-double printPdfPlotFile(std::ofstream& pdfPlotFile, const observation& min, const observation& max,
-                        const array<observation, CLASSES>& means, const array<CovMatrix, CLASSES>& varInverses,
-                        const array<double, CLASSES>& varDets, const array<double, CLASSES>& logPriors);
-void printParamsFile(std::ofstream& boundaryParamsFile, const observation& min, const observation& max,
-                     const array<observation, CLASSES>& means, const array<CovMatrix, CLASSES>& varInverses,
-                     const array<double, CLASSES>& logVarDets, const array<double, CLASSES>& logPriors, double pdfMax);
-bool verifyArguments(int argc, char** argv, Arguments& arg, int& err);
-void printHelp();
+// Part1-Bayes/main.cpp
+#include "main.h"
 
 int main(int argc, char** argv) {
 	int err;
@@ -46,7 +9,7 @@ int main(int argc, char** argv) {
 
 	sample misclassifications[CLASSES];
 	array<sample, CLASSES> samples;
-	array<double, CLASSES> logPriors, varDets = {}, logVarDets = {};
+	array<double, CLASSES> priors, logPriors, varDets = {}, logVarDets = {};
 	array<CovMatrix, CLASSES> varInverses;
 	array<observation, CLASSES> means = getMeans(arg.set);
 	array<CovMatrix, CLASSES> vars    = getVars(arg.set);
@@ -57,18 +20,12 @@ int main(int argc, char** argv) {
 
 	double totalSize = std::accumulate(sizes.begin(), sizes.end(), 0);
 
-	// Compute the log of the priors
-	std::transform(sizes.cbegin(), sizes.cend(), logPriors.begin(),
-	               [totalSize](unsigned size) { return log(size / totalSize); });
-
-	// Compute which case we're in from the book
-	if (arg.discriminantCase == 0) {
-		arg.discriminantCase = detectCase(vars);
-
-		std::cout << "Detected case " << arg.discriminantCase << "\n\n";
-	} else {
-		std::cout << "Overriden case " << arg.discriminantCase << "\n\n";
-	}
+	// Compute priors and their logs
+	std::transform(sizes.cbegin(), sizes.cend(), priors.begin(), logPriors.begin(),
+	               [totalSize](unsigned size, double& prior) {
+		               prior = size / totalSize;
+		               return log(prior);
+	               });
 
 	calcInversesAndDets(arg.discriminantCase, vars, varInverses, varDets, !arg.pdfPlotFile.fail());
 
@@ -82,7 +39,7 @@ int main(int argc, char** argv) {
 
 		unsigned misclassCount =
 		    classifySample(arg.discriminantCase, samples[i], i, misclassifications[i], min, max, means, varInverses,
-		                   logVarDets, logPriors, !arg.misclassPlotFiles[i].fail());
+		                   !arg.misclassPlotFiles[i].fail());
 
 		std::cout << "Misclassification rate for class " << i + 1 << ":\n"
 		          << misclassCount / (double) sizes[i] << "\n\n";
@@ -94,45 +51,90 @@ int main(int argc, char** argv) {
 		if (arg.misclassPlotFiles[i]) { printPlotFile(arg.misclassPlotFiles[i], misclassifications[i]); }
 	}
 
-	std::cout << "Overall misclassification rate:\n" << overallMisclass / totalSize << '\n';
+	std::cout << "Overall misclassification rate:\n" << overallMisclass / totalSize << "\n\n";
+
+	double bhattacharyyaBound = errorBoundFunc(.5, means, vars, varDets, priors);
+	double chernoffBound;
+
+	double minBound = 0, maxBound = 1, prospectiveBound = 0.5;
+	double minBoundVal         = errorBoundFuncDiff(minBound, means, vars, varDets, priors);
+	double maxBoundVal         = errorBoundFuncDiff(maxBound, means, vars, varDets, priors);
+	double prospectiveBoundVal = errorBoundFuncDiff(prospectiveBound, means, vars, varDets, priors);
+	unsigned iters             = 0;
+
+	if (prospectiveBoundVal < 0) {
+		minBoundVal = prospectiveBoundVal;
+		minBound    = prospectiveBound;
+	} else if (prospectiveBoundVal > 0) {
+		maxBoundVal = prospectiveBoundVal;
+		maxBound    = prospectiveBound;
+	}
+
+	double guess[]      = {0.5, (minBound + maxBound) / 2.};
+	double oldGuessVal  = prospectiveBoundVal;
+	prospectiveBoundVal = errorBoundFuncDiff(guess[1], means, vars, varDets, priors);
+
+	while (abs(prospectiveBoundVal) > ERROR_BOUND_MIN_EPSILON && iters < ERROR_BOUND_MAX_ITERS) {
+		// Update bounds
+		if (prospectiveBoundVal < 0) {
+			minBoundVal = prospectiveBoundVal;
+			minBound    = guess[1];
+		} else if (prospectiveBoundVal > 0) {
+			maxBoundVal = prospectiveBoundVal;
+			maxBound    = guess[1];
+		}
+
+		// Find the next guess from secant method
+		double nextGuess = guess[1] - prospectiveBoundVal * (guess[1] - guess[0]) / (prospectiveBoundVal - oldGuessVal);
+
+		// If the next guess from the secant method is outside our bounds, it is attempting to diverge.
+		// Use bisection method instead.
+		if (nextGuess < minBound || nextGuess > maxBound) { nextGuess = (minBound + maxBound) / 2.0; }
+
+		// Advance the iteration
+		guess[0] = guess[1];
+		guess[1] = nextGuess;
+
+		oldGuessVal         = prospectiveBoundVal;
+		prospectiveBoundVal = errorBoundFuncDiff(guess[1], means, vars, varDets, priors);
+
+		iters++;
+	}
+
+	chernoffBound = errorBoundFunc(guess[1], means, vars, varDets, priors);
+
+	std::cout << "Bhattacharyya Bound:\n"
+	          << bhattacharyyaBound << "\n\n"
+	          << "Chernoff Bound:\n"
+	          << chernoffBound << " @ beta = " << guess[1] << "\n\n"
+	          << "Number of iterations required to find Chernoff Bound:\n"
+	          << iters << "\n\n"
+	          << "Epsilon:\n"
+	          << abs(prospectiveBoundVal) << "\n";
+
+	if (arg.errorBoundFile) { printErrorBoundFile(arg.errorBoundFile, means, vars, varDets, priors); }
 
 	double pdfMax = 0;
 	if (arg.pdfPlotFile) {
-		pdfMax = printPdfPlotFile(arg.pdfPlotFile, min, max, means, varInverses, varDets, logPriors);
+		pdfMax = printPdfPlotFile(arg.pdfPlotFile, min, max, means, varInverses, varDets, priors);
 
 		// Round it so that the z tick values are not so ugly
 		pdfMax = round(pdfMax * 100) / 100;
 	}
 
 	if (arg.boundaryParamsFile) {
-		printParamsFile(arg.boundaryParamsFile, min, max, means, varInverses, logVarDets, logPriors, pdfMax);
+		printParamsFile(arg.boundaryParamsFile, min, max, means, varInverses, logVarDets, logPriors, pdfMax,
+		                bhattacharyyaBound, chernoffBound, guess[1]);
 	}
 
 	return 0;
 }
 
-double discriminate(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
-                         double logPrior) {
+double discriminate(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse) {
 	// Note that varInverse is what is passed, and the inverse of a diagonal matrix is also a
 	// diagonal matrix with the diagonal elements being the reciprocal of the original elements. So
 	// instead of dividing by sigma^2, we multiply by 1/sigma^2.
 	return (varInverse(0, 0) * mu).dot(obs) - varInverse(0, 0) * mu.dot(mu) / 2.0;
-}
-
-unsigned detectCase(const array<CovMatrix, CLASSES>& vars) {
-	// Default case is 3, since it covers all other cases as well
-	unsigned discriminantCase = 3;
-
-	// If all the covariance matrices are equal, then we're in case 2
-	if (std::equal(vars.cbegin() + 1, vars.cend(), vars.cbegin())) {
-		discriminantCase = 2;
-
-		// If the first covariance matrix is a scalar matrix (diagonal and all
-		// elements on the diagonal are the same number), then we're in case 1
-		if (vars[0].isDiagonal() && (vars[0].diagonal().array() == vars[0](0, 0)).all()) { discriminantCase = 1; }
-	}
-
-	return discriminantCase;
 }
 
 void calcInversesAndDets(unsigned discriminantCase, const array<CovMatrix, CLASSES>& vars,
@@ -162,9 +164,9 @@ void calcInversesAndDets(unsigned discriminantCase, const array<CovMatrix, CLASS
 				determinant = 1;
 			} else {
 				// See below why we don't use LLT decomposition in this case
-				Eigen::PartialPivLU<CovMatrix> varLU = vars[0].lu();
-				inverse                              = varLU.inverse();
-				determinant                          = varLU.determinant();
+				PartialPivLU<CovMatrix> varLU = vars[0].lu();
+				inverse                       = varLU.inverse();
+				determinant                   = varLU.determinant();
 			}
 
 			std::for_each(varInverses.begin(), varInverses.end(), [&inverse](CovMatrix& inv) { inv = inverse; });
@@ -178,7 +180,7 @@ void calcInversesAndDets(unsigned discriminantCase, const array<CovMatrix, CLASS
 			// inverse.
 			std::transform(vars.cbegin(), vars.cend(), varInverses.begin(), varDets.begin(),
 			               [](const CovMatrix& var, CovMatrix& inverse) {
-				               Eigen::PartialPivLU<CovMatrix> varLU = var.lu();
+				               PartialPivLU<CovMatrix> varLU = var.lu();
 
 				               inverse = varLU.inverse();
 
@@ -190,8 +192,7 @@ void calcInversesAndDets(unsigned discriminantCase, const array<CovMatrix, CLASS
 
 unsigned classifySample(unsigned discriminantCase, const sample& samp, unsigned correctClass, sample& misclass,
                         observation& min, observation& max, const array<observation, CLASSES>& means,
-                        const array<CovMatrix, CLASSES>& varInverses, const array<double, CLASSES>& logVarDets,
-                        const array<double, CLASSES>& logPriors, bool plotMisclassifications) {
+                        const array<CovMatrix, CLASSES>& varInverses, bool plotMisclassifications) {
 	unsigned misclassCount = 0;
 
 #pragma omp declare reduction(min:observation : omp_out = omp_out.cwiseMin(omp_in)) initializer(omp_priv(omp_orig))
@@ -201,11 +202,11 @@ unsigned classifySample(unsigned discriminantCase, const sample& samp, unsigned 
     initializer(omp_priv(omp_orig))
 #pragma omp parallel for reduction(+ : misclassCount) reduction(min : min) reduction(max : max) reduction(append : misclass)
 	for (unsigned j = 0; j < samp.size(); j++) {
-		double maxDiscriminant = discriminate(samp[j], means[0], varInverses[0], logVarDets[0], logPriors[0]);
+		double maxDiscriminant = discriminate(samp[j], means[0], varInverses[0]);
 		double discriminant;
 
 		for (unsigned k = 1; k < CLASSES; k++) {
-			discriminant = discriminate(samp[j], means[k], varInverses[k], logVarDets[k], logPriors[k]);
+			discriminant = discriminate(samp[j], means[k], varInverses[k]);
 
 			if (k == correctClass && discriminant < maxDiscriminant ||
 			    k > correctClass && discriminant > maxDiscriminant) {
@@ -235,14 +236,25 @@ void printPlotFile(std::ofstream& plotFile, const sample& samp) {
 	}
 }
 
+void printErrorBoundFile(std::ofstream& plotFile, const array<observation, 2>& means, const array<CovMatrix, 2>& vars,
+                         const array<double, 2>& varDets, const array<double, 2>& priors) {
+	plotFile << "#        x           y          y'\n" << std::fixed << std::setprecision(7);
+
+	for (unsigned i = 0; i < ERROR_BOUND_SAMPLES; i++) {
+		double x  = i / ((double) ERROR_BOUND_SAMPLES - 1);
+		double y  = errorBoundFunc(x, means, vars, varDets, priors);
+		double dy = errorBoundFuncDiff(x, means, vars, varDets, priors);
+		plotFile << std::setw(10) << x << "  " << std::setw(10) << y << "  " << std::setw(10) << dy << '\n';
+	}
+}
+
 double printPdfPlotFile(std::ofstream& pdfPlotFile, const observation& min, const observation& max,
                         const array<observation, CLASSES>& means, const array<CovMatrix, CLASSES>& varInverses,
-                        const array<double, CLASSES>& varDets, const array<double, CLASSES>& logPriors) {
+                        const array<double, CLASSES>& varDets, const array<double, CLASSES>& priors) {
 	double pdfMax = 0;
-	array<double, CLASSES> varDetRoots, priors;
+	array<double, CLASSES> varDetRoots;
 
 	std::transform(varDets.cbegin(), varDets.cend(), varDetRoots.begin(), [](double det) { return sqrt(det); });
-	std::transform(logPriors.cbegin(), logPriors.cend(), priors.begin(), [](double logPrior) { return exp(logPrior); });
 
 	pdfPlotFile << "#        x           y           z       class\n" << std::fixed << std::setprecision(7);
 #pragma omp parallel for ordered collapse(2) reduction(max : pdfMax)
@@ -281,7 +293,8 @@ double printPdfPlotFile(std::ofstream& pdfPlotFile, const observation& min, cons
 
 void printParamsFile(std::ofstream& boundaryParamsFile, const observation& min, const observation& max,
                      const array<observation, CLASSES>& means, const array<CovMatrix, CLASSES>& varInverses,
-                     const array<double, CLASSES>& logVarDets, const array<double, CLASSES>& logPriors, double pdfMax) {
+                     const array<double, CLASSES>& logVarDets, const array<double, CLASSES>& logPriors, double pdfMax,
+                     double bhattacharyyaBound, double chernoffBound, double betaStar) {
 	array<double, (DIM * (DIM + 1)) / 2 + DIM + 1> boundaryCoeffs;
 	// Corresponds to the difference in the matrices "W_i" in the book
 	CovMatrix diffW = -1 / 2.0 * (varInverses[0] - varInverses[1]);
@@ -316,14 +329,69 @@ void printParamsFile(std::ofstream& boundaryParamsFile, const observation& min, 
 	                   << "  " << std::setw(10) << "xmax"
 	                   << "  " << std::setw(10) << "ymin"
 	                   << "  " << std::setw(10) << "ymax"
-	                   << "  " << std::setw(10) << "zmax\n"
+	                   << "  " << std::setw(10) << "zmax"
+	                   << "  " << std::setw(10) << "boundB"
+	                   << "  " << std::setw(10) << "boundC"
+	                   << "  " << std::setw(10) << "betaStar" << '\n'
 	                   << std::fixed << std::setprecision(7);
 
 	// Print parameters, starting with coefficients calculated above
 	for (double coeff : boundaryCoeffs) { boundaryParamsFile << std::setw(10) << coeff << "  "; }
 	// Then misc. parameters
 	boundaryParamsFile << std::setw(10) << min[0] << "  " << std::setw(10) << max[0] << "  " << std::setw(10) << min[1]
-	                   << "  " << std::setw(10) << max[1] << "  " << std::setw(10) << pdfMax;
+	                   << "  " << std::setw(10) << max[1] << "  " << std::setw(10) << pdfMax << "  " << std::setw(10)
+	                   << bhattacharyyaBound << "  " << std::setw(10) << chernoffBound << "  " << std::setw(10)
+	                   << betaStar;
+}
+
+double errorBoundFunc(double beta, const array<observation, 2>& means, const array<CovMatrix, 2>& vars,
+                      const array<double, 2>& dets, const array<double, 2>& priors) {
+	observation diffMu                    = means[0] - means[1];
+	CovMatrix weightedVar                 = (1 - beta) * vars[0] + beta * vars[1];
+	PartialPivLU<CovMatrix> weightedVarLU = weightedVar.lu();
+
+	return pow(priors[0], beta) * pow(priors[1], 1 - beta) *
+	       exp(-((beta * (1 - beta)) / 2. * diffMu.dot(weightedVarLU.inverse() * diffMu) +
+	             1 / 2. * log(weightedVarLU.determinant() / pow(dets[0], 1 - beta) / pow(dets[1], beta))));
+}
+
+double errorBoundFuncDiff(double beta, const array<observation, 2>& means, const array<CovMatrix, 2>& vars,
+                          const array<double, 2>& dets, const array<double, 2>& priors) {
+	observation diffMu                    = means[0] - means[1];
+	CovMatrix weightedVar                 = (1 - beta) * vars[0] + beta * vars[1];
+	PartialPivLU<CovMatrix> weightedVarLU = weightedVar.lu();
+	CovMatrix weightedVarInverse          = weightedVarLU.inverse();
+	double weightedVarDistance            = diffMu.dot(weightedVarLU.inverse() * diffMu);
+	CovMatrix weightedVarInnerDiff        = -vars[0] + vars[1];
+	double logInner                       = weightedVarLU.determinant() / pow(dets[0], 1 - beta) / pow(dets[1], beta);
+
+	// Triple product rule original functions (f*g*h)' = f'gh + fg'h + fgh'
+	double f = pow(priors[0], beta), g = pow(priors[1], 1 - beta),
+	       h  = exp(-((beta * (1 - beta)) / 2. * weightedVarDistance + 1 / 2. * log(logInner)));
+	double df = f * log(priors[0]), dg = -g * log(priors[1]);
+
+	// Triple quotient rule original functions (f / g / h)' = (f'gh-fg'h - fgh') / g^2 / h^2
+	// For calculating h' above
+	double f2 = weightedVarLU.determinant();
+	double g2 = pow(dets[0], 1 - beta);
+	double h2 = pow(dets[1], beta);
+
+	// Jacobi's formula
+	double df2 = weightedVarLU.determinant() * (weightedVarInverse * weightedVarInnerDiff).trace(),
+	       dg2 = -g2 * log(dets[0]), dh2 = h2 * log(dets[1]);
+
+	double tripleQuotientDiff = (df2 * g2 * h2 - f2 * dg2 * h2 - f2 * g2 * dh2) / (g2 * g2 * h2 * h2);
+
+	// The first term of k is also a triple product, but the first 2 derivatives are simple, so it has jsut been written
+	// out without intermediate variables. Note that (A^{-1})' = -A^{-1}A'A^{-1} when dealing with matrices.
+	double dk = (1 - beta) / 2. * weightedVarDistance - beta / 2. * weightedVarDistance +
+	            (beta * (1 - beta)) / 2. *
+	                diffMu.dot((-weightedVarInverse * weightedVarInnerDiff * weightedVarInverse) * diffMu) +
+	            1 / 2. * (tripleQuotientDiff) / (logInner);
+
+	double dh = h * (-dk);
+
+	return df * g * h + f * dg * h + f * g * dh;
 }
 
 bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
@@ -445,6 +513,22 @@ bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
 			}
 
 			i++;
+		} else if (!strcmp(argv[i], "-peb")) {
+			if (i + 1 >= argc) {
+				std::cout << "Missing error bound plot file.\n\n";
+				err = 1;
+				printHelp();
+				return false;
+			}
+
+			arg.errorBoundFile.open(argv[i + 1]);
+			if (!arg.errorBoundFile) {
+				std::cout << "Could not open file \"" << argv[i + 1] << "\".\n";
+				err = 2;
+				return false;
+			}
+
+			i++;
 		} else if (!strcmp(argv[i], "-c")) {
 			if (i + 1 >= argc) {
 				std::cout << "Missing case number.\n\n";
@@ -478,9 +562,9 @@ bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
 
 void printHelp() {
 	Arguments arg;
-	std::cout << "Usage: classify-euclid <data set> [options]                            (1)\n"
-	          << "   or: classify-euclid -h                                              (2)\n\n"
-	          << "(1) Run a Euclid classifier on a specific data set.\n"
+	std::cout << "Usage: classify-bayes <data set> [options]                            (1)\n"
+	          << "   or: classify-bayes -h                                              (2)\n\n"
+	          << "(1) Run a Bayes classifier on a specific data set.\n"
 	          << "    Data sets available are 'A' and 'B'.\n"
 	          << "(2) Print this help menu.\n\n"
 	          << "OPTIONS\n"
