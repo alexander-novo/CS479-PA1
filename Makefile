@@ -95,21 +95,21 @@ out/euclid/sample1-%.dat out/euclid/sample2-%.dat out/euclid/sample1-misclass-%.
 	                              -pm2 out/euclid/sample2-misclass-$*.dat\
 	                              -pdb out/euclid/params-$*.dat | tee out/euclid/classification-rate-$*.txt
 
-out/euclid/sample-plot-%.png: out/euclid/sample1-%.dat out/euclid/sample2-%.dat out/euclid/params-%.dat  Part2-Euclid/plot.plt
+out/euclid/sample-plot-%.png: out/euclid/sample1-%.dat out/euclid/sample2-%.dat out/euclid/params-%.dat Part1-Bayes/plot.plt
 	@gnuplot -e "outfile='$@'"\
 	         -e "sample1='out/euclid/sample1-$*.dat'"\
 	         -e "sample2='out/euclid/sample2-$*.dat'"\
 	         -e "plotTitle='Data Set $*'"\
 	         -e "paramFile='out/euclid/params-$*.dat'"\
-	         Part2-Euclid/plot.plt
+	         Part1-Bayes/plot.plt
 
-out/euclid/misclass-plot-%.png: out/euclid/sample1-misclass-%.dat out/euclid/sample2-misclass-%.dat out/euclid/params-%.dat Part2-Euclid/plot.plt
+out/euclid/misclass-plot-%.png: out/euclid/sample1-misclass-%.dat out/euclid/sample2-misclass-%.dat out/euclid/params-%.dat Part1-Bayes/plot.plt
 	@gnuplot -e "outfile='$@'"\
 	         -e "sample1='out/euclid/sample1-misclass-$*.dat'"\
 	         -e "sample2='out/euclid/sample2-misclass-$*.dat'"\
 	         -e "plotTitle='Misclassified Observations From Data Set $*'"\
 	         -e "paramFile='out/euclid/params-$*.dat'"\
-	         Part2-Euclid/plot.plt
+	         Part1-Bayes/plot.plt
 
 # Figures needed for the report
 # Part 1

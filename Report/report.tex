@@ -243,6 +243,7 @@ To make plots, \texttt{gnuplot} was used. To plot the decision boundary, \texttt
 \subsection{Results and Discussion}
 
 \subsubsection{Data Set A}
+\label{sec:results-bayes-a}
 
 The results of classifying data set A can be found in \cref{lst:output-set-a-bayes}. We can see that the misclassification rate for class 1 is significantly higher than the misclassification rate for class 2 - this is due to the prior probability of class 1 being lower than the prior probability of class 2, so the Bayes classifier is correctly trading higher classification error from class 1 into more classification error reduction from class 2. Also, the overall misclassification rate is correctly much lower than both the Bhattacharyya bound and the Chernoff bound, although the Chernoff bound does not improve on the Bhattacharyya bound that much.
 
@@ -320,5 +321,52 @@ A plot of the error bound function from \cref{eq:error-bound-func} can be found 
 
 \subsection{Results and Discussion}
 
+\subsubsection{Data Set A}
+
+The results of classifying data set A can be found in \cref{lst:output-set-a-euclid}. As expected from what was discussed in \cref{sec:results-bayes-a}, the misclassification rates between classes are very similar, due to the classifier no longer compensating for differences in prior probabilities. This also leads to the misclassification rate being a little bit higher (1.6735\% v.s. 1.5445\%), so this classifier is not optimum, but the difference in error is still pretty small.
+
+\lstinputlisting[style=out, caption={Output from classifying data set A.}, label={lst:output-set-a-euclid}]{../out/euclid/classification-rate-A.txt}
+
+A comparison of the decision boundaries between the Bayes classifier and the Euclidean distance classifier can be found in \cref{fig:sample-comparison-A}. Note that both decision boundaries are linear, although slightly different. This means that the change in discriminant only has a marginal effect on the misclassification rate. In \cref{fig:misclass-comparison-A}, we can see the additional misclassified points.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.45\textwidth]{../out/bayes/sample-plot-A.png}
+	\includegraphics[width=.45\textwidth]{../out/euclid/sample-plot-A.png}
+	\caption{A comparison of the decision boundaries between the Bayes classifier (left) and the Euclidean distance classifier (right) for data set A.}
+	\label{fig:sample-comparison-A}
+\end{figure}
+
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.45\textwidth]{../out/bayes/misclass-plot-A.png}
+	\includegraphics[width=.45\textwidth]{../out/euclid/misclass-plot-A.png}
+	\caption{A comparison of the misclassified points from the Bayes classifier (left) and the Euclidean distance classifier (right) for data set A.}
+	\label{fig:misclass-comparison-A}
+\end{figure}
+
+\subsubsection{Data Set B}
+
+The results of classifying data set A can be found in \cref{lst:output-set-b-euclid}. This time, there is a big difference in misclassification rates between classes \emph{and} between classifiers (7.322\% v.s. 16.075\%). This can be attributed to the large difference in decision boundary (linear v.s. elliptical), which can be seen in \cref{fig:sample-comparison-B}. Therefore, not only is the Euclidean distance classifier not an \emph{optimum} classifier, it is not a good approximation of one either. The additional misclassified points can be seen in \cref{fig:misclass-comparison-B}.
+
+\lstinputlisting[style=out, caption={Output from classifying data set B.}, label={lst:output-set-b-euclid}]{../out/euclid/classification-rate-B.txt}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.475\textwidth]{../out/bayes/sample-plot-B.png}
+	\includegraphics[width=.475\textwidth]{../out/euclid/sample-plot-B.png}
+	\caption{A comparison of the decision boundaries between the Bayes classifier (left) and the Euclidean distance classifier (right) for data set B.}
+	\label{fig:sample-comparison-B}
+\end{figure}
+
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.475\textwidth]{../out/bayes/misclass-plot-B.png}
+	\includegraphics[width=.475\textwidth]{../out/euclid/misclass-plot-B.png}
+	\caption{A comparison of the misclassified points from the Bayes classifier (left) and the Euclidean distance classifier (right) for data set B.}
+	\label{fig:misclass-comparison-B}
+\end{figure}
 
 \end{document}

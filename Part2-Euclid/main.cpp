@@ -12,14 +12,15 @@ int main(int argc, char** argv) {
 	array<observation, CLASSES> means = getMeans(arg.set);
 	array<CovMatrix, CLASSES> vars    = getVars(arg.set);
 	array<unsigned, CLASSES> sizes    = getSizes(arg.set);
-	double sigmaSquared;
 	getSamples(arg.set, samples, arg.seed);
 
 	observation min = samples[0].front(), max = samples[0].front();
 
 	double totalSize = std::accumulate(sizes.begin(), sizes.end(), 0);
 
-	sigmaSquared = vars[0](0, 0);
+	std::cout << "Classifying data set \"" << dataSetName(arg.set) << "\" - " << CLASSES << " classes.\n";
+
+	double sigmaSquared = vars[0](0, 0);
 
 	unsigned overallMisclass = 0;
 

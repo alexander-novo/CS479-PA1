@@ -28,7 +28,7 @@ unset contour
 
 
 # set terminal pdf enhanced size 8in, 4.8in
-set terminal png enhanced size 8000, 4800 truecolor font "arial,60"
+set terminal png enhanced size 8000, 4800 truecolor font "arial,90"
 set encoding utf8
 set output outfile
 
@@ -50,6 +50,6 @@ if(exists("raw")) {
 
 plot sample1 u 1:2 w circles notitle,\
      sample2 u 1:2 w circles notitle,\
-	 $ContourTable w lines lw 6 lc rgb 'black' notitle,\
+	 $ContourTable w lines lw 6 lc rgb 'black' title "Decision Boundary",\
 	 NaN w circles fill solid 1.0 noborder lc 1 title "ω_1",\
 	 NaN w circles fill solid 1.0 noborder lc 2 title "ω_2"
