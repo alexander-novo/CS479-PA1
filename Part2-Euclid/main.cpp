@@ -27,6 +27,8 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
+
+
 bool verifyArguments(int argc, char** argv, Arguments& arg, int& err) {
 	if (argc < 2 || (argc < 2 && strcmp(argv[1], "-h") && strcmp(argv[1], "--help"))) {
 		std::cout << "Missing operand.\n\n";
