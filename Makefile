@@ -87,7 +87,7 @@ out/bayes/error-bound-%.pdf: out/bayes/error-bound-%.dat out/bayes/params-%.dat 
 	         Part1-Bayes/plot-error-bound.plt
 
 ### Part 2 Outputs ###
-out/euclid/sample1-%.dat out/euclid/sample2-%.dat out/euclid/sample1-misclass-%.dat out/euclid/sample2-misclass-%.dat out/euclid/error-bound-%.dat out/euclid/params-%.dat out/euclid/pdf-%.dat out/euclid/classification-rate-%.txt: Part1-Euclid/classify-euclid | out/euclid
+out/euclid/sample1-%.dat out/euclid/sample2-%.dat out/euclid/sample1-misclass-%.dat out/euclid/sample2-misclass-%.dat out/euclid/error-bound-%.dat out/euclid/params-%.dat out/euclid/pdf-%.dat out/euclid/classification-rate-%.txt: Part2-Euclid/classify-euclid | out/euclid
 	Part2-Euclid/classify-euclid $* -ps1 out/euclid/sample1-$*.dat\
 	                              -ps2 out/euclid/sample2-$*.dat\
 	                              -pm1 out/euclid/sample1-misclass-$*.dat\
