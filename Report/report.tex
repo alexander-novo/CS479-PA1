@@ -91,7 +91,7 @@ we arrive at
 \begin{equation}
 	\vec X = \qty(A_w^\top)^{-1} \vec Y.
 \end{equation}
-Then we can simply add $\vec \mu$ to obtain $\vec Z = \vec X + \vec \mu$ where $\vec Z \sim \mathcal N(\vec \mu, \Sigma)$ is our ''goal'' distribution.
+Then we can simply add $\vec \mu$ to obtain $\vec Z = \vec X + \vec \mu$ where $\vec Z \sim \mathcal N(\vec \mu, \Sigma)$ is our ``goal'' distribution.
 
 \subsubsection{Bayesian classifier for Gaussian-distributed classes}
 
@@ -121,7 +121,7 @@ By further narrowing down certain cases, we can simplify this discriminant by re
 		&= (\Sigma^{-1}\vec\mu_i)^\top\vec x -\frac{1}{2}\vec\mu_i^\top\Sigma^{-1}\vec\mu_i + \ln(P(Y = \omega_i)). \label{eq:dicriminant-case2}
 \end{align}
 
-Furthermore, if $\Sigma$ is a scalar matrix $\Sigma = \sigma^2 I$ (referred to as ``case 1'' in the book), then $\Sigma^{-1} = \frac{1}{\sigma^2}$ and from \cref{eq:dicriminant-case2-unsimplified} above, we have
+Furthermore, if $\Sigma$ is a scalar matrix $\Sigma = \sigma^2 I$ (referred to as ``case 1'' in the book), then $\Sigma^{-1} = \frac{1}{\sigma^2} I$ and from \cref{eq:dicriminant-case2-unsimplified} above, we have
 \begin{equation}
 	\begin{split}
 		g_i(\vec x) &= -\frac{1}{2\sigma^2}(\vec x - \vec\mu_i)^\top(\vec x - \vec\mu_i) + \ln(P(Y = \omega_i))\\
@@ -155,7 +155,7 @@ which gives us
 \end{align}
 This is in the general form of a quadric, which in two dimensions looks like
 \[
-	ax^2 + bx + cy^2 + dx + ey + f = 0,
+	ax^2 + bxy + cy^2 + dx + ey + f = 0,
 \]
 where
 \begin{align}

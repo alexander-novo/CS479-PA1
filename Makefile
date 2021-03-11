@@ -23,11 +23,12 @@ OBJDIRS      = $(addprefix $(OBJDIR)/, $(SOURCEDIRS))
 DEPDIRS      = $(addprefix $(DEPDIR)/, $(SOURCEDIRS))
 DEPFILES     = $(SOURCES:%.cpp=$(DEPDIR)/%.d)
 
-.PHONY: all clean report
+.PHONY: all exec clean report
 .SECONDARY:
 
 # By default, make all executable targets and the outputs required for the homework
-all: $(EXEC) $(REQUIRED_OUT)
+all: exec $(REQUIRED_OUT) Report/report.pdf
+exec: $(EXEC)
 
 # Executable Targets
 Part1-Bayes/classify-bayes: $(OBJDIR)/Part1-Bayes/main.o $(OBJDIR)/Common/sample.o
@@ -43,7 +44,7 @@ out/bayes/sample1-%.dat out/bayes/sample2-%.dat out/bayes/sample1-misclass-%.dat
 	                              -pm1 out/bayes/sample1-misclass-$*.dat\
 	                              -pm2 out/bayes/sample2-misclass-$*.dat\
 	                              -pdf out/bayes/pdf-$*.dat\
-								  -peb out/bayes/error-bound-$*.dat\
+	                              -peb out/bayes/error-bound-$*.dat\
 	                              -pdb out/bayes/params-$*.dat | tee out/bayes/classification-rate-$*.txt
 
 out/bayes/sample-plot-%.png: out/bayes/sample1-%.dat out/bayes/sample2-%.dat out/bayes/params-%.dat  Part1-Bayes/plot.plt
@@ -66,25 +67,25 @@ out/bayes/sample-pdf-plot-%.png: out/bayes/pdf-%.dat out/bayes/sample1-%.dat out
 	@gnuplot -e "outfile='$@'"\
 	         -e "pdfFile='out/bayes/pdf-$*.dat"\
 	         -e "plotTitle='Joint pdf and samples from Data Set $*'"\
-			 -e "sample1='out/bayes/sample1-$*.dat'"\
+	         -e "sample1='out/bayes/sample1-$*.dat'"\
              -e "sample2='out/bayes/sample2-$*.dat'"\
-			 -e "paramFile='out/bayes/params-$*.dat'"\
+	         -e "paramFile='out/bayes/params-$*.dat'"\
 	         Part1-Bayes/plot-pdf.plt
 
 out/bayes/misclass-pdf-plot-%.png: out/bayes/pdf-%.dat out/bayes/sample1-misclass-%.dat out/bayes/sample2-misclass-%.dat out/bayes/params-%.dat Part1-Bayes/plot-pdf.plt
 	@gnuplot -e "outfile='$@'"\
 	         -e "pdfFile='out/bayes/pdf-$*.dat"\
 	         -e "plotTitle='Joint pdf and misclassified samples from Data Set $*'"\
-			 -e "sample1='out/bayes/sample1-misclass-$*.dat'"\
+	         -e "sample1='out/bayes/sample1-misclass-$*.dat'"\
              -e "sample2='out/bayes/sample2-misclass-$*.dat'"\
-			 -e "paramFile='out/bayes/params-$*.dat'"\
+	         -e "paramFile='out/bayes/params-$*.dat'"\
 	         Part1-Bayes/plot-pdf.plt
 
 out/bayes/error-bound-%.pdf: out/bayes/error-bound-%.dat out/bayes/params-%.dat Part1-Bayes/plot-error-bound.plt
 	@gnuplot -e "outfile='$@'"\
 	         -e "plotTitle='Error bound function for Data Set $*'"\
-			 -e "boundFile='out/bayes/error-bound-$*.dat'"\
-			 -e "paramFile='out/bayes/params-$*.dat'"\
+	         -e "boundFile='out/bayes/error-bound-$*.dat'"\
+	         -e "paramFile='out/bayes/params-$*.dat'"\
 	         Part1-Bayes/plot-error-bound.plt
 
 ### Part 2 Outputs ###
@@ -120,10 +121,14 @@ report: out/bayes/classification-rate-A.txt out/bayes/classification-rate-B.txt 
 report: out/euclid/sample-plot-A.png out/euclid/sample-plot-B.png out/euclid/misclass-plot-A.png out/euclid/misclass-plot-B.png
 report: out/euclid/classification-rate-A.txt out/euclid/classification-rate-B.txt
 
+Report/report.pdf: Report/report.tex report
+	latexmk -pdf -cd -use-make -silent -pdflatex='pdflatex -interaction=batchmode -synctex=1' $<
+
 clean:
 	rm -rf $(OBJDIR)
 	rm -f $(EXEC)
 	rm -rf out
+	cd Report/; latexmk -c
 
 # Generate .png images from .pgm images. Needed for report, since pdfLaTeX doesn't support .pgm images
 %.png: %.pgm
