@@ -40,6 +40,9 @@ set style circle radius 0.03
 
 set title plotTitle
 
+set xlabel "x_1"
+set ylabel "x_2"
+
 if(exists("raw")) {
 	unset border
 	unset xtics
@@ -48,8 +51,8 @@ if(exists("raw")) {
 	unset key
 }
 
-plot sample1 u 1:2 w circles notitle,\
-     sample2 u 1:2 w circles notitle,\
+plot sample1 u 1:2 w circles lc rgb '#7570b3' notitle,\
+     sample2 u 1:2 w circles lc rgb '#1b9e77' notitle,\
 	 $ContourTable w lines lw 6 lc rgb 'black' title "Decision Boundary",\
-	 NaN w circles fill solid 1.0 noborder lc 1 title "ω_1",\
-	 NaN w circles fill solid 1.0 noborder lc 2 title "ω_2"
+	 NaN w circles fill solid 1.0 noborder lc rgb '#7570b3' title "ω_1",\
+	 NaN w circles fill solid 1.0 noborder lc rgb '#1b9e77' title "ω_2"

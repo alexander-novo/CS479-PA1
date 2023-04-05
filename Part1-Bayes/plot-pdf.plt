@@ -54,6 +54,8 @@ set xyplane at BASE
 set xtics scale .5
 set ytics scale .5
 set ztics 0,(zmax/4)
+set xlabel "x_1"
+set ylabel "x_2"
 
 splot pdfFile u 1:2:3:4 w pm3d lc rgb "black" lw 1 notitle,\
 	  sample1 u 1:2:(BASE) w points pt 6 ps .75 lw 4.5 lc rgb "#a97570b3" notitle,\

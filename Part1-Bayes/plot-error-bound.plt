@@ -15,6 +15,7 @@ set output outfile
 
 set autoscale fix
 set yrange [0:* < .3]
+set xlabel "β"
 
 set title plotTitle
 set arrow from 0.,boundB to 0.5,boundB      nohead lc rgb "black" dashtype 2
