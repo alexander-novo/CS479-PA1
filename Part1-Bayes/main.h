@@ -21,6 +21,7 @@ struct Arguments {
 	unsigned seed             = 1;
 	unsigned discriminantCase = 0;
 	std::ofstream plotFiles[CLASSES], misclassPlotFiles[CLASSES], boundaryParamsFile, pdfPlotFile, errorBoundFile;
+	std::ifstream dataInputFile;
 };
 
 double discriminateCase1(const observation& obs, const Vec<CLASSES>& mu, const CovMatrix& varInverse, double logVarDet,
